@@ -40,11 +40,11 @@ export function Footer() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <GradientText className="text-2xl font-extrabold">GB</GradientText>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-[var(--color-text-primary)] text-xl">
                   Barrionuevo
                 </span>
               </div>
-              <p className="text-sm text-[var(--color-text-muted)]">
+              <p className="text-sm text-[var(--color-text-tertiary)]">
                 Desarrollador Full Stack · Lima, Perú
               </p>
             </div>
@@ -69,7 +69,7 @@ export function Footer() {
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-4">
               Navegación
             </p>
-            <ul className="flex flex-col gap-2">
+            <ul className="grid grid-cols-2 gap-x-8 gap-y-2">
               {NAV_ITEMS.map((item) => (
                 <li key={item.href}>
                   <button

@@ -80,7 +80,7 @@ export function Hero() {
       />
 
       {/* Main content */}
-      <div className="container-custom relative z-10 w-full py-28 lg:py-0">
+      <div className="container-custom relative z-10 w-full pb-8 pt-24 lg:py-0">
         <div className="grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-12 lg:gap-16 items-center min-h-screen lg:py-24">
 
           {/* ── Left column ── */}
@@ -90,15 +90,15 @@ export function Hero() {
             <FadeUp delay={0}>
               <div className="inline-flex">
                 <div
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--color-border)] text-sm text-[var(--color-text-secondary)]"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--color-border-hover)] text-sm text-[var(--color-text-tertiary)]"
                   style={{
                     background: 'rgba(19,19,31,0.7)',
                     backdropFilter: 'blur(8px)',
                   }}
                 >
-                  <span className="relative flex h-2 w-2">
+                  <span className="relative flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
                   </span>
                   Disponible para nuevas oportunidades
                 </div>
@@ -114,7 +114,7 @@ export function Hero() {
 
             {/* Name */}
             <FadeUp delay={0.2}>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight text-[var(--color-text-primary)]">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-[0.025em] text-[var(--color-text-primary)]">
                 {name}
               </h1>
             </FadeUp>

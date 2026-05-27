@@ -1,4 +1,5 @@
 import type { HeroData } from '@/modules/hero/hero.types'
+import cvPdf from '@/assets/documents/CV_GianCarlo_Barrionuevo.pdf'
 
 export const heroData: HeroData = {
   name: 'Gian Barrionuevo',
@@ -16,7 +17,8 @@ export const heroData: HeroData = {
     { name: 'Node.js', color: '#339933' },
     { name: 'Tailwind CSS', color: '#06B6D4' },
   ],
-  cvUrl: '/cv/gian-barrionuevo-cv.pdf',
+
+  cvUrl: cvPdf,
   linkedIn: 'https://linkedin.com/in/gianbarrionuevo',
   github: 'https://github.com/gianbarrionuevo',
   email: 'geancarlosbarrionuevo@gmail.com',

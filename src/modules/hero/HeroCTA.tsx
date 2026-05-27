@@ -84,7 +84,7 @@ export function HeroCTA({ cvUrl, linkedIn, github, email, delay = 0 }: HeroCTAPr
           icon={<Download size={18} />}
           iconPosition="left"
         >
-          Descargar CV
+          Visualizar CV
         </Button>
         <Button
           variant="outline"
@@ -100,7 +100,7 @@ export function HeroCTA({ cvUrl, linkedIn, github, email, delay = 0 }: HeroCTAPr
       {/* Divider */}
       <motion.div variants={staggerItem} className="flex items-center gap-3">
         <div className="h-px flex-1 bg-[var(--color-border)]" />
-        <span className="text-xs text-[var(--color-text-muted)]">o encuéntrame en</span>
+        <span className="text-xs text-[var(--color-text-secondary)]">o encuéntrame en</span>
         <div className="h-px flex-1 bg-[var(--color-border)]" />
       </motion.div>
 

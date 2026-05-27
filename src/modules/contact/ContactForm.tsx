@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react'
+import React, { forwardRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { motion, AnimatePresence } from 'framer-motion'
 import emailjs from '@emailjs/browser'
@@ -213,7 +213,12 @@ export function ContactForm() {
   const fieldDisabled = isLoading
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
+
+        <p className="text-[var(--color-text-secondary)] leading-relaxed">
+            Formulario - Correo
+        </p>
+
       <FloatingInput
         fieldId="name"
         label="Nombre completo"
