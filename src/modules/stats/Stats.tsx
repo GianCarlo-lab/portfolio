@@ -63,7 +63,6 @@ export function Stats() {
           label="Métricas"
           title="En números"
           subtitle="Mi trayectoria resumida"
-          align="center"
         />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-10">

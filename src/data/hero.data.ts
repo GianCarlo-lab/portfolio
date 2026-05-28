@@ -20,6 +20,6 @@ export const heroData: HeroData = {
 
   cvUrl: cvPdf,
   linkedIn: 'https://linkedin.com/in/gianbarrionuevo',
-  github: 'https://github.com/gianbarrionuevo',
-  email: 'geancarlosbarrionuevo@gmail.com',
+  github: 'https://github.com/GianCarlo-lab',
+  email: 'https://mail.google.com/mail/?view=cm&fs=1&to=geancarlosbarrionuevo@gmail.com&su=Contacto%20desde%20tu%20portafolio'
 }

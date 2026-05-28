@@ -34,11 +34,10 @@ export function Services() {
           label="Servicios"
           title="Servicios"
           subtitle="¿Qué puedo construir para ti?"
-          align="center"
         />
 
         <RevealOnScroll variant="fadeInUp" delay={0.1}>
-          <p className="text-[var(--color-text-secondary)] text-base max-w-2xl mx-auto text-center mt-4 mb-12">
+          <p className="text-[var(--color-text-secondary)] text-base max-w-2xl mx-rigth text-rigth mt-4 mb-12">
             Trabajo de forma independiente con empresas y emprendedores que necesitan
             soluciones digitales reales. Cada proyecto es tratado con el mismo estándar
             de calidad que aplicaría en cualquier empresa.

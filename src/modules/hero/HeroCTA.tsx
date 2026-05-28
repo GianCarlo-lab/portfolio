@@ -60,9 +60,8 @@ function SocialIcon({ href, label, icon: Icon }: SocialIconProps) {
 }
 
 export function HeroCTA({ cvUrl, linkedIn, github, email, delay = 0 }: HeroCTAProps) {
-  const emailHref = `mailto:${email}`
 
-  const socialLinks = { linkedIn, github, email: emailHref }
+  const socialLinks = { linkedIn, github, email }
 
   return (
     <motion.div

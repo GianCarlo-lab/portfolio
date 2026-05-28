@@ -83,12 +83,20 @@ export function HeroAvatar() {
                                 userSelect: 'none',
                             }}
                         >
-                            <img
+                            <motion.img
                                 src={perfilPrincipal}
                                 alt="Foto de Gian Carlo"
                                 className="w-full h-full object-cover"
                                 style={{
                                     objectPosition: 'center 25%',
+                                }}
+                                animate={{
+                                    scale: [1, 1.06, 1],
+                                }}
+                                transition={{
+                                    duration: 6,
+                                    repeat: Infinity,
+                                    ease: 'easeInOut',
                                 }}
                             />
                         </div>

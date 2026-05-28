@@ -39,16 +39,16 @@ export function TimelineItem({ item, index, isLast }: TimelineItemProps) {
   const hasMore = extra.length > 0
 
   return (
-    <div ref={ref} className="flex gap-6">
+    <div ref={ref} className="flex gap-2">
       {/* Timeline dot */}
       <div className="flex flex-col items-center flex-shrink-0">
         <div className="relative flex items-center justify-center w-10 h-10 z-10 flex-shrink-0">
           {item.current && (
-            <span className="absolute inline-flex h-10 w-10 rounded-full bg-primary opacity-30 animate-ping" />
+            <span className="absolute inline-flex h-7 w-7 rounded-full bg-primary opacity-30 animate-ping" />
           )}
           <div
             className={cn(
-              'w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300',
+              'w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-300',
               item.current
                 ? 'border-primary bg-primary shadow-glow'
                 : 'border-[var(--color-border)] bg-dark-800'

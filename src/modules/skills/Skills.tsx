@@ -79,7 +79,7 @@ export function Skills() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-5">
                       {cat.skills.length} tecnologías
                     </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className="flex flex-wrap gap-3 items-start">
                       {cat.skills.map((skill, i) => (
                         <SkillPill key={skill.name} skill={skill} index={i} />
                       ))}

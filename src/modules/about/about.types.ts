@@ -4,9 +4,16 @@ export interface AboutHighlight {
   value: string
 }
 
+export interface ValueDemo {
+  type: 'code' | 'symmetry' | 'learning' | 'fullstack' | 'teamwork'
+  title: string
+  description: string
+}
+
 export interface AboutValue {
   title: string
   description: string
+  demo: ValueDemo
 }
 
 export interface AboutData {

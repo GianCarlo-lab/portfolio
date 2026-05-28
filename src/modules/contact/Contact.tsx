@@ -57,7 +57,6 @@ export function Contact() {
           label="Contacto"
           title="¿Tienes un proyecto en mente?"
           subtitle="Hablemos. Estoy disponible para nuevas oportunidades."
-          align="center"
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-10 mt-10">

@@ -136,7 +136,7 @@ export const projects: Project[] = [
       { name: 'WordPress', color: '#21759B' },
       { name: 'WooCommerce', color: '#7F54B3' },
       { name: 'PHP', color: '#777BB4' },
-      { name: 'HTML', color: '#E34F26' },
+      { name: 'HTML5', color: '#E34F26' },
       { name: 'CSS', color: '#1572B6' },
       { name: 'JavaScript', color: '#F7DF1E' },
       { name: 'MySQL', color: '#4479A1' },

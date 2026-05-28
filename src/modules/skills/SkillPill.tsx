@@ -36,7 +36,7 @@ export function SkillPill({ skill, index }: SkillPillProps) {
       transition={{ delay: index * 0.05, duration: 0.3 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-full cursor-default select-none transition-all duration-200"
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-full cursor-default select-none whitespace-nowrap transition-all duration-200"
       style={{
         border: `1px solid ${hovered ? safeColor + '60' : 'rgba(255,255,255,0.06)'}`,
         background: hovered ? `${safeColor}0D` : 'rgba(19,19,31,0.6)',
