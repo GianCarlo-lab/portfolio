@@ -53,6 +53,7 @@ const ICON_MAP: Record<string, IconMapEntry> = {
   '.NET 8':           { Component: SiDotnet,           color: '#512BD4' },
   '.NET 8 / C#':      { Component: SiDotnet,           color: '#512BD4' },
   '.NET 8 (C#)':      { Component: SiDotnet,           color: '#512BD4' },
+  'MAUI Blazor':      { Component: SiDotnet,           color: '#512BD4' },
   'ASP.NET Core':     { Component: SiDotnet,           color: '#512BD4' },
   'Blazor':           { Component: SiBlazor,           color: '#512BD4' },
   'Blazor Server':    { Component: SiBlazor,           color: '#512BD4' },
@@ -81,6 +82,7 @@ const ICON_MAP: Record<string, IconMapEntry> = {
 
   // ── Reporting / Files ────────────────────────────────────────────
   'Entity Framework': { Component: TbDatabase,         color: '#512BD4' },
+  'Dapper':           { Component: TbDatabase,         color: '#512BD4' },
   'ClosedXML':        { Component: TbFileSpreadsheet,  color: '#217346' },
   'ClosedXML (Excel)': { Component: TbFileSpreadsheet, color: '#217346' },
   'QuestPDF':         { Component: TbFileTypePdf,      color: '#FF0000' },
