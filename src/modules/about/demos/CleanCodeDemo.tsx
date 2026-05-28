@@ -109,30 +109,35 @@ const CLEAN = `interface PriceCalculationResult {
   itemsAboveThreshold: number[]
 }
 
-const calculatePriceWithDiscount = (
+const calculatePrice = (
   discount: number,
-  prices: number[],
+  prices: (number | null | undefined)[],
   threshold: number,
   applyDiscount: boolean
 ): PriceCalculationResult => {
-  const validPrices = prices.filter(Boolean)
+  let total = 0
+  const itemsAboveThreshold: number[] = []
 
-  if (!applyDiscount) {
-    const total = validPrices
-      .reduce((sum, price) => sum + price, 0)
-    return { total, itemsAboveThreshold: [] }
+  const validPrices = prices.filter(
+    (price): price is number => price != null
+  )
+
+  for (const price of validPrices) {
+    if (applyDiscount) {
+      total += price * discount
+
+      if (total > threshold) {
+        itemsAboveThreshold.push(price)
+      }
+    } else {
+      total += price
+    }
   }
 
-  const discountedPrices = validPrices
-    .map(price => price * discount)
-
-  const total = discountedPrices
-    .reduce((sum, price) => sum + price, 0)
-
-  const itemsAboveThreshold = discountedPrices
-    .filter(price => price > threshold)
-
-  return { total, itemsAboveThreshold }
+  return {
+    total,
+    itemsAboveThreshold
+  }
 }`
 
 // ─── Metric bar ──────────────────────────────────────────────────────────────
