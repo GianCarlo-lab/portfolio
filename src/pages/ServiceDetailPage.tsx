@@ -16,6 +16,7 @@ import { SectionTitle } from '@/components/common/SectionTitle/SectionTitle'
 import { RevealOnScroll } from '@/components/common/RevealOnScroll/RevealOnScroll'
 import { ServiceTimeline } from '@/modules/services/ServiceTimeline'
 import { useScrollProgress } from '@/hooks/useScrollProgress'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import { getTechIcon } from '@/utils/techIcons'
 
 // ─── Static data maps ─────────────────────────────────────────────────────────
@@ -179,6 +180,7 @@ function ReturnNavbar({ onBack }: { onBack: () => void }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function ServiceDetailPage() {
+  useScrollToTop()
   const { serviceId } = useParams<{ serviceId: string }>()
   const navigate = useNavigate()
 

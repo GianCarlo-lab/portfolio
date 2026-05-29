@@ -20,7 +20,7 @@ function WhatsAppFAB() {
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ delay: 2, type: 'spring', stiffness: 260, damping: 20 }}
-      className="fixed z-50 bottom-8 right-8 max-sm:bottom-6 max-sm:right-6"
+      className="fixed z-40 bottom-8 right-8 max-sm:bottom-6 max-sm:right-6"
     >
       <div className="relative flex items-center">
         {/* Tooltip */}

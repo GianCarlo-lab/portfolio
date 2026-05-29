@@ -45,7 +45,7 @@ export function ValueDrawer({ value, isOpen, onClose, index = 0 }: ValueDrawerPr
   return (
     <AnimatePresence>
       {isOpen && value && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-[60] flex">
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}

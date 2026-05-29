@@ -19,6 +19,12 @@
   --color-text-muted: #475569;
   --font-display: 'Sora', sans-serif;
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-index hierarchy */
+  --z-whatsapp-btn: 40;
+  --z-header: 50;
+  --z-drawer: 60;
+  --z-modal: 60;
 }
 
 @keyframes rotate-border {

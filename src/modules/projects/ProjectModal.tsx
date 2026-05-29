@@ -304,7 +304,7 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-[60] flex">
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
