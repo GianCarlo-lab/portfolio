@@ -4,6 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 :root {
   --color-bg-primary: #0A0A0F;
   --color-bg-secondary: #0F0F1A;

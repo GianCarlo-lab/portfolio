@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Trophy, RotateCcw, ChevronRight } from 'lucide-react'
+import { Trophy, RotateCcw } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
 
 export interface FeedbackRange {
@@ -16,8 +16,6 @@ export interface ScoreBoardProps {
   feedback: FeedbackRange[]
   gianComment: string
   onReset: () => void
-  onNext?: () => void
-  nextLabel?: string
   extraInfo?: string
 }
 
@@ -29,8 +27,6 @@ export function ScoreBoard({
   feedback,
   gianComment,
   onReset,
-  onNext,
-  nextLabel = 'Siguiente desafío →',
   extraInfo,
 }: ScoreBoardProps) {
   const effectiveGianScore = gianScore ?? maxScore
@@ -66,7 +62,7 @@ export function ScoreBoard({
                 {displayScore} / {maxScore} pts
               </span>
             </div>
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div className="h-3 rounded-full overflow-hidden w-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <motion.div
                 className="h-full rounded-full"
                 style={{ background: activeFeedback.color }}
@@ -84,7 +80,7 @@ export function ScoreBoard({
                 {effectiveGianScore} / {maxScore} pts
               </span>
             </div>
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div className="h-3 rounded-full overflow-hidden w-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <motion.div
                 className="h-full rounded-full"
                 style={{ background: '#6366F1' }}
@@ -134,7 +130,7 @@ export function ScoreBoard({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3">
           <button
             onClick={onReset}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] transition-all"
@@ -142,16 +138,6 @@ export function ScoreBoard({
             <RotateCcw size={14} />
             Intentar de nuevo
           </button>
-          {onNext && (
-            <button
-              onClick={onNext}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-              style={{ background: '#6366F1' }}
-            >
-              {nextLabel}
-              <ChevronRight size={14} />
-            </button>
-          )}
         </div>
       </GlassCard>
     </motion.div>

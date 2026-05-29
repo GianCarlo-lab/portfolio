@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { GradientText } from '@/components/ui/GradientText/GradientText'
-import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
 import { useScrollProgress } from '@/hooks/useScrollProgress'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 
 const VALUE_NAV = [
   { label: 'Clean Code', path: '/sobre-mi/clean-code' },
@@ -52,9 +52,15 @@ export function AboutPageLayout({
 }: AboutPageLayoutProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  useScrollToTop()
+
+  const goTo = (path: string) => {
+    window.scrollTo(0, 0)
+    navigate(path)
+  }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg-primary)' }}>
+    <div className="min-h-screen overflow-x-hidden w-full max-w-full" style={{ background: 'var(--color-bg-primary)' }}>
       <ScrollProgressBar accentColor={accentColor} />
 
       {/* Navbar */}
@@ -130,8 +136,8 @@ export function AboutPageLayout({
         </span>
 
         <div
-          className="relative z-10 w-full flex flex-col items-center justify-center text-center"
-          style={{ padding: '0 24px 40px' }}
+          className="relative z-10 w-full flex flex-col items-center justify-center text-center px-4"
+          style={{ paddingBottom: 40 }}
         >
           <motion.span
             initial={{ opacity: 0, y: 8 }}
@@ -154,14 +160,14 @@ export function AboutPageLayout({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.14 }}
-            className="text-lg text-[var(--color-text-secondary)] max-w-2xl leading-relaxed"
+            className="text-base md:text-lg text-[var(--color-text-secondary)] max-w-2xl leading-relaxed"
           >
             {description}
           </motion.p>
         </div>
       </section>
 
-      {/* Value nav strip */}
+      {/* Value nav strip — scrollable, no scrollbar */}
       <div
         className="sticky z-40"
         style={{
@@ -172,13 +178,23 @@ export function AboutPageLayout({
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <div className="flex items-center justify-center gap-1 sm:gap-2 px-4 py-2.5 max-w-3xl mx-auto overflow-x-auto">
+        <div
+          className="flex items-center gap-1 sm:gap-2 px-4 py-2.5"
+          style={{
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch',
+            maxWidth: 768,
+            margin: '0 auto',
+          }}
+        >
+          <style>{`.about-nav::-webkit-scrollbar{display:none}`}</style>
           {VALUE_NAV.map((item) => {
             const isActive = pathname === item.path
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => goTo(item.path)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0"
                 style={{
                   background: isActive ? `${accentColor}20` : 'transparent',
@@ -201,49 +217,46 @@ export function AboutPageLayout({
       </div>
 
       {/* Main content */}
-      <main style={{ maxWidth: 1000, margin: '0 auto', padding: '64px 24px 48px' }}>
+      <main className="w-full max-w-full overflow-x-hidden" style={{ maxWidth: 1000, margin: '0 auto', padding: '64px 16px 48px' }}>
         {children}
 
-        {/* Prev / Next */}
-        {(prevPath || nextPath) && (
-          <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {prevPath && prevLabel ? (
-              <GlassCard hoverable className="p-5" onClick={() => navigate(prevPath)}>
-                <div className="flex items-center gap-3">
-                  <ChevronLeft size={18} className="text-[var(--color-text-muted)] flex-shrink-0" />
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">
-                      Anterior
-                    </p>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {prevLabel}
-                    </p>
-                  </div>
-                </div>
-              </GlassCard>
-            ) : (
-              <div />
-            )}
+        {/* Prev / Next — compact text buttons */}
+        <div
+          className="flex justify-between items-center mt-12 pt-8"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          {prevPath && prevLabel ? (
+            <button
+              onClick={() => goTo(prevPath)}
+              className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors group"
+            >
+              <ChevronLeft
+                size={16}
+                className="transition-transform group-hover:-translate-x-1"
+              />
+              <span>{prevLabel}</span>
+            </button>
+          ) : (
+            <div />
+          )}
 
-            {nextPath && nextLabel ? (
-              <GlassCard hoverable className="p-5" onClick={() => navigate(nextPath)}>
-                <div className="flex items-center justify-end gap-3">
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">
-                      Siguiente
-                    </p>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {nextLabel}
-                    </p>
-                  </div>
-                  <ChevronRight size={18} className="text-[var(--color-text-muted)] flex-shrink-0" />
-                </div>
-              </GlassCard>
-            ) : (
-              <div />
-            )}
-          </div>
-        )}
+          <span className="text-xs text-[var(--color-text-muted)]">{valueNumber} / 05</span>
+
+          {nextPath && nextLabel ? (
+            <button
+              onClick={() => goTo(nextPath)}
+              className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors group"
+            >
+              <span>{nextLabel}</span>
+              <ChevronRight
+                size={16}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </button>
+          ) : (
+            <div />
+          )}
+        </div>
       </main>
     </div>
   )

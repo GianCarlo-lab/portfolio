@@ -1,311 +1,308 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Quote, Monitor, Server, Database, RefreshCw } from 'lucide-react'
+import { Quote, ChevronDown, RefreshCw, Database, Server, Monitor, Layers } from 'lucide-react'
 import { AboutPageLayout } from './AboutPageLayout'
-import { ChallengeCard } from '@/components/common/ChallengeCard/ChallengeCard'
-import { ScoreBoard } from '@/components/common/ScoreBoard/ScoreBoard'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
-import type { FeedbackRange } from '@/components/common/ScoreBoard/ScoreBoard'
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
-interface Scenario {
-  id: number
+interface Step {
+  number: number
   title: string
-  symptom: string
-  tools: {
-    id: string
-    icon: React.ReactNode
-    label: string
-    output: string
-  }[]
-  options: {
-    id: string
-    label: string
-    pts: number
-    feedback: string
-  }[]
-  gianComment: string
+  description: string
+  detail: React.ReactNode
 }
 
-const SCENARIOS: Scenario[] = [
+interface Feature {
+  id: string
+  requirement: string
+  steps: Step[]
+}
+
+const FEATURES: Feature[] = [
   {
-    id: 1,
-    title: "Pedido no se crea",
-    symptom: "El usuario hace click en 'Confirmar pedido' y no pasa nada. La pantalla se congela 2 segundos.",
-    tools: [
+    id: 'excel',
+    requirement: 'El cliente necesita exportar el inventario a Excel con formato corporativo',
+    steps: [
       {
-        id: 'browser',
-        icon: <Monitor size={14} />,
-        label: 'Browser DevTools',
-        output: `POST /api/pedidos → 400 Bad Request
-Response: {
-  "error": "Validation failed",
-  "field": "clienteId",
-  "message": "Required field missing"
-}`,
+        number: 1,
+        title: '¿Qué datos necesito?',
+        description: 'Primero voy a la BD. ¿Qué tablas involucra? ¿Cuántos registros puede tener? ¿Necesito paginación o es exportación total?',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed overflow-x-auto" style={{ color: '#A5B4FC' }}>
+            {`-- Tablas involucradas
+SELECT i.Id, i.Nombre, i.Stock, i.PrecioUnitario,
+       c.Nombre AS Categoria, p.Nombre AS Proveedor
+FROM Inventario i
+JOIN Categorias c ON i.CategoriaId = c.Id
+JOIN Proveedores p ON i.ProveedorId = p.Id
+-- ~2,500 registros en producción → necesito paginación`}
+          </div>
+        ),
       },
       {
-        id: 'server',
-        icon: <Server size={14} />,
-        label: 'Server Logs',
-        output: `[2026-05-29 10:43:17] INFO  POST /api/pedidos
-[2026-05-29 10:43:17] WARN  Validation error: ClienteId is null
-[2026-05-29 10:43:17] INFO  → 400 Bad Request`,
+        number: 2,
+        title: '¿Cómo lo estructuro en el backend?',
+        description: 'Nuevo endpoint GET /api/inventario/export. Un service que consulta con Dapper. ClosedXML para generar el archivo en memoria. Stream de respuesta para no saturar memoria.',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed overflow-x-auto" style={{ color: '#A5B4FC' }}>
+            {`// InventarioController.cs
+[HttpGet("export")]
+public async Task<IActionResult> ExportInventario()
+{
+    var items = await _service.GetAllForExportAsync();
+    var stream = _excelService.Generate(items);
+    return File(stream,
+        "application/vnd.openxmlformats...",
+        "inventario.xlsx");
+}`}
+          </div>
+        ),
       },
       {
-        id: 'sql',
-        icon: <Database size={14} />,
-        label: 'SQL Server',
-        output: `-- No hay errores en la BD.
--- La request no llegó al repositorio.
--- Última inserción exitosa: hace 2 horas.`,
-      },
-    ],
-    options: [
-      { id: 'A', label: 'La BD le falta el campo clienteId', pts: 0, feedback: "No. El SQL log muestra que la request nunca llegó a la BD. El error es anterior." },
-      { id: 'B', label: 'El frontend no está enviando clienteId en el body', pts: 40, feedback: "Correcto. El DevTools muestra 400 con 'field: clienteId'. El backend lo validó, el frontend no lo envió. Bug en el form submit." },
-      { id: 'C', label: 'El JWT de autenticación falló', pts: 0, feedback: "No. Un 401 indicaría JWT. El 400 con field validation es un problema de datos, no de auth." },
-      { id: 'D', label: 'El DTO no mapea correctamente clienteId', pts: 20, feedback: "Parcialmente correcto. Puede ser el DTO. Pero el DevTools ya muestra que el campo no llega en la request — el problema está en el frontend antes del DTO." },
-    ],
-    gianComment: "Este bug exacto lo tuve en RADAR. El form de pedidos tenía un selector de cliente desconectado del estado de React. Enviaba el form sin el clienteId. 20 minutos de DevTools lo resolvió.",
-  },
-  {
-    id: 2,
-    title: "Excel falla con más de 1000 filas",
-    symptom: "La exportación a Excel funciona con 50 registros pero falla silenciosamente con 1000+. El usuario espera y no pasa nada.",
-    tools: [
-      {
-        id: 'browser',
-        icon: <Monitor size={14} />,
-        label: 'Browser DevTools',
-        output: `GET /api/ventas/export → 504 Gateway Timeout
-Request time: 30,021ms
-Response: null (timeout)`,
-      },
-      {
-        id: 'server',
-        icon: <Server size={14} />,
-        label: 'Server Logs',
-        output: `[INFO]  GET /api/ventas/export?rows=1000
-[INFO]  Executing query: SELECT * FROM Ventas...
-[INFO]  Query elapsed: 31,450ms
-[ERROR] Request timeout after 30s
-[INFO]  Connection closed`,
-      },
-      {
-        id: 'sql',
-        icon: <Database size={14} />,
-        label: 'Memory Profiler',
-        output: `Generating Excel via ClosedXML...
-Rows loaded into memory: 1,247
-Memory peak: 512MB (limit: 256MB)
-ClosedXML: OutOfMemoryException
-Process terminated`,
-      },
-    ],
-    options: [
-      { id: 'A', label: 'La query SQL no tiene índice en la columna de fecha', pts: 15, feedback: "Parcialmente correcto. Sin índice la query es lenta. Pero el Memory Profiler muestra OutOfMemoryException — la causa principal es cargar todo en memoria." },
-      { id: 'B', label: 'No hay paginación y todo se carga en memoria a la vez', pts: 40, feedback: "Correcto. Timeout en servidor + OutOfMemoryException en ClosedXML = query sin límite + generación sin chunking. La solución es OFFSET/FETCH en SQL y generación por lotes." },
-      { id: 'C', label: 'El servidor no tiene suficiente RAM', pts: 0, feedback: "No. El problema es arquitectural, no de hardware. Más RAM solo pospone el problema. La solución es no cargar todo en memoria." },
-      { id: 'D', label: 'El timeout del servidor es muy corto', pts: 5, feedback: "No es la causa raíz. Aumentar el timeout solo hace que el usuario espere más antes de fallar. El problema es que la operación no escala." },
-    ],
-    gianComment: "Este segundo bug lo resolví exactamente en RADAR. El módulo de ventas fallaba con más de 500 registros. Implementé paginación en la query con OFFSET/FETCH y generación por chunks en ClosedXML. El Excel de 10,000 filas ahora genera en 3 segundos.",
-  },
-]
+        number: 3,
+        title: '¿Cómo lo conecto al frontend?',
+        description: 'Blazor llama al endpoint. JS Interop para disparar la descarga. Botón con estado loading mientras genera. Feedback al usuario cuando termina.',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed overflow-x-auto" style={{ color: '#A5B4FC' }}>
+            {`@* ExportButton.razor *@
+<button @onclick="HandleExport" disabled="@_loading">
+    @if (_loading) { <span>Generando...</span> }
+    else { <span>Exportar Excel</span> }
+</button>
 
-const FEEDBACK: FeedbackRange[] = [
-  { range: [0, 30], message: "El debug fullstack es una habilidad que se desarrolla. Lo clave: siempre empieza por el error más cercano al síntoma.", color: '#F59E0B' },
-  { range: [31, 55], message: "Buen razonamiento. Usaste las herramientas correctamente para aislar el problema.", color: '#06B6D4' },
-  { range: [56, 80], message: "Pensamiento sistemático sólido. Así es como se debuggea en producción real.", color: '#10B981' },
-  { range: [81, 140], message: "Diagnóstico de nivel senior. Conectas síntoma, herramientas y causa raíz sin asumir.", color: '#6366F1' },
-]
-
-// ── Debug Game ────────────────────────────────────────────────────────────────
-
-function DebugGame({ onComplete }: { onComplete: (pts: number) => void }) {
-  const [scenarioIdx, setScenarioIdx] = useState(0)
-  const [usedTools, setUsedTools] = useState<Set<string>>(new Set())
-  const [openTool, setOpenTool] = useState<string | null>(null)
-  const [answer, setAnswer] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
-  const [totalPts, setTotalPts] = useState(0)
-  const [scenarioPts, setScenarioPts] = useState<number[]>([])
-  const [allDone, setAllDone] = useState(false)
-
-  const scenario = SCENARIOS[scenarioIdx]
-
-  const handleToolClick = (toolId: string) => {
-    setUsedTools(prev => new Set([...prev, toolId]))
-    setOpenTool(openTool === toolId ? null : toolId)
-  }
-
-  const handleSubmit = () => {
-    if (!answer || submitted) return
-    const opt = scenario.options.find(o => o.id === answer)!
-    const toolBonus = usedTools.size * 10
-    const pts = opt.pts + toolBonus
-    const newTotal = totalPts + pts
-    const newScenarioPts = [...scenarioPts, pts]
-
-    setTotalPts(newTotal)
-    setScenarioPts(newScenarioPts)
-    setSubmitted(true)
-
-    if (scenarioIdx === SCENARIOS.length - 1) {
-      setAllDone(true)
-      onComplete(newTotal)
+@code {
+    async Task HandleExport() {
+        _loading = true;
+        await JS.InvokeVoidAsync("downloadFile",
+            "/api/inventario/export");
+        _loading = false;
     }
-  }
+}`}
+          </div>
+        ),
+      },
+      {
+        number: 4,
+        title: '¿Qué puede salir mal?',
+        description: 'Pienso en los edge cases antes de escribir una línea.',
+        detail: (
+          <div className="flex flex-col gap-2">
+            {[
+              { icon: '⚠️', case: 'Query lenta con muchos registros', sol: 'Paginación con OFFSET/FETCH' },
+              { icon: '⚠️', case: 'Timeout del servidor', sol: 'Streaming de respuesta' },
+              { icon: '⚠️', case: 'Formato incorrecto de Excel', sol: 'Template corporativo con ClosedXML' },
+              { icon: '🔒', case: 'Usuario sin permisos', sol: 'Middleware de autorización por rol' },
+            ].map(item => (
+              <div key={item.case} className="flex items-start gap-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span>{item.icon}</span>
+                <span><strong>{item.case}</strong> → {item.sol}</span>
+              </div>
+            ))}
+          </div>
+        ),
+      },
+      {
+        number: 5,
+        title: '¿Cómo lo entrego?',
+        description: 'El código es solo el 70% del trabajo. El otro 30% es comunicación.',
+        detail: (
+          <div className="flex flex-col gap-2">
+            {[
+              { icon: '📋', item: 'PR con descripción del feature + capturas' },
+              { icon: '📖', item: 'README actualizado con nuevo endpoint' },
+              { icon: '🎬', item: 'Demo al equipo en el sprint review' },
+              { icon: '✅', item: 'Merge a develop después del code review' },
+            ].map(i => (
+              <div key={i.item} className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span>{i.icon}</span>
+                <span>{i.item}</span>
+              </div>
+            ))}
+          </div>
+        ),
+      },
+    ],
+  },
+  {
+    id: 'validation',
+    requirement: 'Agregar validación de fechas en el formulario de ventas',
+    steps: [
+      {
+        number: 1,
+        title: '¿Qué datos necesito?',
+        description: '¿Qué reglas de negocio aplican? ¿Qué rangos son válidos? ¿El backend ya valida o solo el frontend?',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed" style={{ color: '#A5B4FC' }}>
+            {`// Reglas de negocio
+const reglas = [
+  "No fechas futuras (> hoy)",
+  "No anteriores a 2020-01-01",
+  "Formato: DD/MM/YYYY",
+  "Backend también valida (defensa en profundidad)"
+]`}
+          </div>
+        ),
+      },
+      {
+        number: 2,
+        title: '¿Cómo lo estructuro en el backend?',
+        description: 'Data annotation en el DTO + validación personalizada en el service layer.',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed overflow-x-auto" style={{ color: '#A5B4FC' }}>
+            {`// VentaDto.cs
+[DataType(DataType.Date)]
+[DateRange(minYear: 2020, allowFuture: false)]
+public DateTime FechaVenta { get; set; }
 
-  const nextScenario = () => {
-    setScenarioIdx(s => s + 1)
-    setUsedTools(new Set())
-    setOpenTool(null)
-    setAnswer(null)
-    setSubmitted(false)
-  }
+// VentaService.cs
+if (dto.FechaVenta > DateTime.Today)
+    throw new ValidationException("Fecha no válida");`}
+          </div>
+        ),
+      },
+      {
+        number: 3,
+        title: '¿Cómo lo conecto al frontend?',
+        description: 'React Hook Form + validación en tiempo real + mensaje de error descriptivo.',
+        detail: (
+          <div className="font-mono text-xs leading-relaxed overflow-x-auto" style={{ color: '#A5B4FC' }}>
+            {`// SalesForm.tsx
+const { register, formState: { errors } } = useForm()
 
-  const submittedOpt = submitted && answer ? scenario.options.find(o => o.id === answer) : null
+<input {...register("fechaVenta", {
+  validate: v => {
+    const d = new Date(v)
+    if (d > new Date()) return "No puede ser futura"
+    if (d < new Date("2020-01-01")) return "Muy antigua"
+    return true
+  }
+})} />
+{errors.fechaVenta && <Error msg={errors.fechaVenta.message} />}`}
+          </div>
+        ),
+      },
+      {
+        number: 4,
+        title: '¿Qué puede salir mal?',
+        description: 'Los casos de borde de fechas son especialmente traicioneros.',
+        detail: (
+          <div className="flex flex-col gap-2">
+            {[
+              { icon: '⚠️', case: 'Zona horaria diferente', sol: 'Normalizar a UTC en backend' },
+              { icon: '⚠️', case: 'Formato del input browser varía por OS', sol: 'Usar DatePicker controlado' },
+              { icon: '⚠️', case: 'Usuario deja el campo vacío', sol: 'required + mensaje claro' },
+            ].map(item => (
+              <div key={item.case} className="flex items-start gap-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <span>{item.icon}</span>
+                <span><strong>{item.case}</strong> → {item.sol}</span>
+              </div>
+            ))}
+          </div>
+        ),
+      },
+      {
+        number: 5,
+        title: '¿Cómo lo entrego?',
+        description: 'Commit con mensaje semántico, tests manuales documentados.',
+        detail: (
+          <div className="flex flex-col gap-2">
+            {[
+              { icon: '📝', item: 'feat: add date validation to sales form' },
+              { icon: '🧪', item: 'Test manual: fecha futura, fecha antigua, formato inválido' },
+              { icon: '📋', item: 'PR con capturas de los 3 casos de validación' },
+            ].map(i => (
+              <div key={i.item} className="flex items-center gap-2 text-xs font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <span>{i.icon}</span>
+                <span>{i.item}</span>
+              </div>
+            ))}
+          </div>
+        ),
+      },
+    ],
+  },
+]
+
+// ── Feature Accordion ─────────────────────────────────────────────────────────
+
+function FeatureAccordion({ feature }: { feature: Feature }) {
+  const [openStep, setOpenStep] = useState<number | null>(null)
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Scenario header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-[var(--color-text-muted)] mb-1">Escenario {scenarioIdx + 1} de {SCENARIOS.length}</p>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">{scenario.title}</p>
-        </div>
-        {scenarioPts.length > 0 && (
-          <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#A5B4FC' }}>
-            {scenarioPts.reduce((a, b) => a + b, 0)} pts
-          </span>
-        )}
-      </div>
-
-      {/* Symptom */}
+    <div className="flex flex-col gap-3">
+      {/* Requirement */}
       <GlassCard className="p-4">
-        <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-2">Síntoma reportado por el usuario:</p>
-        <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed italic">"{scenario.symptom}"</p>
+        <div className="flex items-start gap-3">
+          <div className="px-2 py-1 rounded-lg text-xs font-semibold flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)', color: '#FCD34D' }}>
+            Requerimiento
+          </div>
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed italic">"{feature.requirement}"</p>
+        </div>
       </GlassCard>
 
-      {/* Toolbar */}
-      <div className="flex gap-2 flex-wrap">
-        {scenario.tools.map(tool => (
-          <button
-            key={tool.id}
-            onClick={() => handleToolClick(tool.id)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-            style={{
-              background: openTool === tool.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${usedTools.has(tool.id) ? 'rgba(99,102,241,0.4)' : 'var(--color-border)'}`,
-              color: usedTools.has(tool.id) ? '#A5B4FC' : 'var(--color-text-secondary)',
-            }}
-          >
-            {tool.icon}
-            {tool.label}
-            {usedTools.has(tool.id) && <span style={{ color: '#10B981' }}>+10pts</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Tool output */}
-      <AnimatePresence>
-        {openTool && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-            <GlassCard className="p-4">
-              <pre className="text-xs leading-relaxed overflow-x-auto font-mono" style={{ color: '#A5B4FC' }}>
-                {scenario.tools.find(t => t.id === openTool)?.output}
-              </pre>
-            </GlassCard>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Question */}
-      {usedTools.size > 0 && (
-        <AnimatePresence>
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3">
-            <p className="text-sm font-semibold text-[var(--color-text-primary)]">¿Dónde está el bug?</p>
-            <div className="flex flex-col gap-2">
-              {scenario.options.map(opt => {
-                const isSelected = answer === opt.id
-                const isCorrect = opt.pts >= 35
-                let bg = isSelected ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)'
-                let borderCol = isSelected ? '#6366F1' : 'var(--color-border)'
-                if (submitted && isSelected && isCorrect) { bg = 'rgba(16,185,129,0.12)'; borderCol = '#10B981' }
-                if (submitted && isSelected && !isCorrect) { bg = 'rgba(245,158,11,0.12)'; borderCol = '#F59E0B' }
-
-                return (
-                  <button
-                    key={opt.id}
-                    disabled={submitted}
-                    onClick={() => setAnswer(opt.id)}
-                    className="flex items-start gap-3 px-4 py-3 rounded-xl border text-left transition-all"
-                    style={{ background: bg, borderColor: borderCol }}
-                  >
-                    <span
-                      className="text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: isSelected ? '#6366F1' : 'rgba(255,255,255,0.1)', color: isSelected ? 'white' : 'var(--color-text-muted)' }}
-                    >
-                      {opt.id}
-                    </span>
-                    <span className="text-sm text-[var(--color-text-secondary)]">{opt.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {answer && !submitted && (
-              <button
-                onClick={handleSubmit}
-                className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-                style={{ background: '#6366F1' }}
-              >
-                Confirmar diagnóstico →
-              </button>
-            )}
-
-            {submitted && submittedOpt && (
-              <div className="flex flex-col gap-3">
-                <GlassCard className="p-4">
-                  <p className="text-xs font-semibold mb-2" style={{ color: submittedOpt.pts >= 35 ? '#10B981' : '#F59E0B' }}>
-                    {submittedOpt.pts >= 35 ? '✓ Diagnóstico correcto' : '⚠ Diagnóstico parcial'}
-                  </p>
-                  <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{submittedOpt.feedback}</p>
-                </GlassCard>
-                <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>
-                  {submittedOpt.pts + usedTools.size * 10} pts (diagnóstico: {submittedOpt.pts} + herramientas: {usedTools.size * 10})
-                </p>
-                {!allDone && (
-                  <button
-                    onClick={nextScenario}
-                    className="self-start flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-                    style={{ background: '#6366F1' }}
-                  >
-                    <RefreshCw size={14} />
-                    Siguiente escenario →
-                  </button>
-                )}
+      {/* Steps */}
+      {feature.steps.map((step) => {
+        const isOpen = openStep === step.number
+        return (
+          <div key={step.number}>
+            <button
+              onClick={() => setOpenStep(isOpen ? null : step.number)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all"
+              style={{
+                background: isOpen ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
+                borderColor: isOpen ? 'rgba(245,158,11,0.3)' : 'var(--color-border)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>
+                  {step.number}
+                </span>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{step.title}</p>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5 line-clamp-1">{step.description}</p>
+                </div>
               </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      )}
+              <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="flex-shrink-0 ml-2">
+                <ChevronDown size={15} style={{ color: 'var(--color-text-muted)' }} />
+              </motion.div>
+            </button>
 
-      {usedTools.size === 0 && (
-        <p className="text-xs text-[var(--color-text-muted)] italic">
-          Usa al menos una herramienta de diagnóstico para desbloquear la pregunta. Cada herramienta usada suma 10pts.
-        </p>
-      )}
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}>
+                  <GlassCard className="p-4 mt-1">
+                    <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed mb-3">{step.description}</p>
+                    <div className="rounded-lg p-3 overflow-x-auto" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      {step.detail}
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
+// ── Architecture Layers ───────────────────────────────────────────────────────
+
+const LAYERS = [
+  { icon: <Monitor size={16} />, label: 'Presentación', tech: 'Blazor / React', color: '#6366F1', desc: 'Componentes UI, estados, interacción con el usuario' },
+  { icon: <Layers size={16} />, label: 'API Layer', tech: 'ASP.NET Core', color: '#8B5CF6', desc: 'Controllers, autenticación JWT, validación de entrada' },
+  { icon: <Server size={16} />, label: 'Lógica de negocio', tech: '.NET Services', color: '#F59E0B', desc: 'Reglas, transformaciones, orquestación de repositorios' },
+  { icon: <Database size={16} />, label: 'Datos', tech: 'Dapper + SQL Server', color: '#10B981', desc: 'Queries optimizadas, transacciones, migrations' },
+]
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function FullStackVisionPage() {
-  const [gameScore, setGameScore] = useState<number | null>(null)
+  useScrollToTop()
+  const [featureIdx, setFeatureIdx] = useState(0)
+  const feature = FEATURES[featureIdx]
 
   return (
     <AboutPageLayout
@@ -318,7 +315,7 @@ export function FullStackVisionPage() {
       nextPath="/sobre-mi/trabajo-en-equipo"
       nextLabel="Trabajo en equipo"
     >
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-12 w-full">
 
         {/* Quote */}
         <div className="relative pl-6 py-1" style={{ borderLeft: '4px solid #F59E0B' }}>
@@ -335,51 +332,87 @@ export function FullStackVisionPage() {
         {/* Pills */}
         <div className="flex flex-wrap gap-2">
           {['End-to-end ownership', 'Sin silos', 'Sistema > componentes'].map(p => (
-            <span
-              key={p}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.25)' }}
-            >
+            <span key={p} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.25)' }}>
               {p}
             </span>
           ))}
         </div>
 
-        {/* Exercise */}
-        <GlassCard className="p-6">
-          <ChallengeCard
-            number={1}
-            total={1}
-            title="Debug fullstack en producción"
-            context={
-              <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
-                2 escenarios de producción real. Usa las herramientas de diagnóstico disponibles (cada una suma 10pts) y luego identifica la causa raíz del bug.
-              </span>
-            }
-            question="Reproduce el proceso de debug que usaría un fullstack: observa el síntoma, investiga con las herramientas disponibles, diagnostica la causa raíz."
-            points={140}
-          >
-            <DebugGame onComplete={setGameScore} />
-          </ChallengeCard>
-        </GlassCard>
+        {/* Feature thinking */}
+        <div>
+          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+            <div>
+              <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">Del requerimiento al código</h3>
+              <p className="text-sm text-[var(--color-text-muted)]">Así pienso cuando me dan una tarea. 5 preguntas antes de escribir una línea.</p>
+            </div>
+            {featureIdx === 0 && (
+              <button
+                onClick={() => setFeatureIdx(1)}
+                className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border transition-all flex-shrink-0"
+                style={{ borderColor: 'rgba(245,158,11,0.3)', color: '#F59E0B', background: 'rgba(245,158,11,0.06)' }}
+              >
+                <RefreshCw size={13} />
+                Ver otro ejemplo
+              </button>
+            )}
+            {featureIdx === 1 && (
+              <button
+                onClick={() => setFeatureIdx(0)}
+                className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border transition-all flex-shrink-0"
+                style={{ borderColor: 'rgba(245,158,11,0.3)', color: '#F59E0B', background: 'rgba(245,158,11,0.06)' }}
+              >
+                <RefreshCw size={13} />
+                Ver primer ejemplo
+              </button>
+            )}
+          </div>
 
-        {/* ScoreBoard */}
-        <AnimatePresence>
-          {gameScore !== null && (
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <ScoreBoard
-                userScore={gameScore}
-                maxScore={140}
-                gianScore={140}
-                feedback={FEEDBACK}
-                gianComment="Este segundo bug lo resolví exactamente en RADAR. El módulo de ventas fallaba con más de 500 registros. Implementé paginación en la query con OFFSET/FETCH y generación por chunks en ClosedXML. El Excel de 10,000 filas ahora genera en 3 segundos."
-                onReset={() => setGameScore(null)}
-                onNext={() => { window.location.href = '/sobre-mi/trabajo-en-equipo' }}
-                nextLabel="Siguiente: Trabajo en equipo →"
-              />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={feature.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.3 }}
+            >
+              <FeatureAccordion feature={feature} />
             </motion.div>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
+
+        {/* Architecture diagram */}
+        <div>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-2">Arquitectura en capas</h3>
+          <p className="text-sm text-[var(--color-text-muted)] mb-6">Las tecnologías reales que uso en RADAR ERP, capa por capa.</p>
+          <div className="flex flex-col gap-3">
+            {LAYERS.map((layer, i) => (
+              <motion.div
+                key={layer.label}
+                initial={{ opacity: 0, x: -16 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.3, delay: i * 0.08 }}
+              >
+                <GlassCard className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${layer.color}20`, color: layer.color }}>
+                      {layer.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-[var(--color-text-primary)]">{layer.label}</p>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${layer.color}18`, color: layer.color }}>
+                          {layer.tech}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1 leading-relaxed">{layer.desc}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
       </div>
     </AboutPageLayout>

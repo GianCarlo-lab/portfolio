@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Quote } from 'lucide-react'
 import { AboutPageLayout } from './AboutPageLayout'
+import { useScrollToTop } from '@/hooks/useScrollToTop'
 import { ChallengeCard } from '@/components/common/ChallengeCard/ChallengeCard'
 import { ScoreBoard } from '@/components/common/ScoreBoard/ScoreBoard'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
@@ -58,20 +59,11 @@ const SOLID_LINES = [
   { id: 7, code: "  return order", correct: false },
 ]
 
-const TS_FIELDS = [
-  { id: 'A', label: 'productId', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'string' },
-  { id: 'B', label: 'name', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'string' },
-  { id: 'C', label: 'quantity', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'number' },
-  { id: 'D', label: 'unitPrice', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'number' },
-  { id: 'E', label: 'isActive', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'boolean' },
-  { id: 'F', label: 'createdAt', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'Date' },
-]
-
 const FEEDBACK: FeedbackRange[] = [
-  { range: [0, 60], message: "Bien comienzo. Los nombres importan más de lo que parece — cada variable que lees es un contrato con el siguiente dev.", color: '#F59E0B' },
-  { range: [61, 120], message: "Buen ojo. Estás aplicando principios reales. Con práctica constante esto se vuelve instintivo.", color: '#06B6D4' },
-  { range: [121, 160], message: "Sólido. Escribes código que se explica a sí mismo. Eso ahorra horas de debug a futuro.", color: '#10B981' },
-  { range: [161, 180], message: "Excelente. Tu código habla por sí solo. Eso es lo que separa a un dev bueno de uno excelente.", color: '#6366F1' },
+  { range: [0, 40], message: "Bien comienzo. Los nombres importan más de lo que parece — cada variable que lees es un contrato con el siguiente dev.", color: '#F59E0B' },
+  { range: [41, 80], message: "Buen ojo. Estás aplicando principios reales. Con práctica constante esto se vuelve instintivo.", color: '#06B6D4' },
+  { range: [81, 105], message: "Sólido. Escribes código que se explica a sí mismo. Eso ahorra horas de debug a futuro.", color: '#10B981' },
+  { range: [106, 120], message: "Excelente. Tu código habla por sí solo. Eso es lo que separa a un dev bueno de uno excelente.", color: '#6366F1' },
 ]
 
 // ── Exercise 1: Drag & Drop rename ──────────────────────────────────────────
@@ -349,109 +341,15 @@ function auditOrder(orderId, log) {
   )
 }
 
-// ── Exercise 3: TypeScript types ─────────────────────────────────────────────
-
-function Ex3({ onComplete }: { onComplete: (pts: number) => void }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [submitted, setSubmitted] = useState(false)
-  const [pts, setPts] = useState(0)
-
-  const handleSubmit = () => {
-    let score = 0
-    TS_FIELDS.forEach(f => {
-      if (answers[f.id] === f.correct) score += 10
-    })
-    setPts(score)
-    setSubmitted(true)
-    onComplete(score)
-  }
-
-  const allAnswered = TS_FIELDS.every(f => answers[f.id])
-
-  return (
-    <div className="flex flex-col gap-5">
-      <GlassCard className="p-5">
-        <pre className="text-sm leading-loose overflow-x-auto">
-          <span style={{ color: '#8B5CF6' }}>interface </span>
-          <span style={{ color: '#06B6D4' }}>SaleItem </span>
-          <span style={{ color: 'var(--color-text-secondary)' }}>{'{'}</span>
-          {TS_FIELDS.map(f => {
-            const val = answers[f.id]
-            const isCorrect = val === f.correct
-            const color = submitted ? (isCorrect ? '#10B981' : '#EF4444') : '#6366F1'
-            return (
-              <div key={f.id} className="pl-4">
-                <span style={{ color: 'var(--color-text-secondary)' }}>{f.label}: </span>
-                <span style={{ color: val ? color : 'rgba(99,102,241,0.5)', fontWeight: val ? 600 : 400 }}>
-                  {val ?? `___${f.id}___`}
-                </span>
-                {submitted && <span className="ml-2 text-xs" style={{ color }}>{isCorrect ? '✓' : `✗ (${f.correct})`}</span>}
-              </div>
-            )
-          })}
-          <span style={{ color: 'var(--color-text-secondary)' }}>{'}'}</span>
-        </pre>
-      </GlassCard>
-
-      <div className="flex flex-col gap-3">
-        {TS_FIELDS.map(f => (
-          <div key={f.id} className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-mono text-[var(--color-text-muted)] w-24">{f.label}:</span>
-            <div className="flex gap-2 flex-wrap">
-              {f.options.map(opt => {
-                const isSelected = answers[f.id] === opt
-                const isCorrect = opt === f.correct
-                let bg = isSelected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)'
-                let borderCol = isSelected ? '#6366F1' : 'var(--color-border)'
-                if (submitted && isSelected && isCorrect) { bg = 'rgba(16,185,129,0.15)'; borderCol = '#10B981' }
-                if (submitted && isSelected && !isCorrect) { bg = 'rgba(239,68,68,0.15)'; borderCol = '#EF4444' }
-                if (submitted && !isSelected && isCorrect) { bg = 'rgba(16,185,129,0.08)'; borderCol = '#10B981' }
-
-                return (
-                  <button
-                    key={opt}
-                    disabled={submitted}
-                    onClick={() => setAnswers(prev => ({ ...prev, [f.id]: opt }))}
-                    className="px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all"
-                    style={{ background: bg, border: `1px solid ${borderCol}`, color: isSelected ? '#A5B4FC' : 'var(--color-text-secondary)' }}
-                  >
-                    {opt}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {!submitted && allAnswered && (
-        <button
-          onClick={handleSubmit}
-          className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-          style={{ background: '#6366F1' }}
-        >
-          Verificar tipos →
-        </button>
-      )}
-
-      {submitted && (
-        <p className="text-sm font-semibold" style={{ color: pts >= 50 ? '#10B981' : '#F59E0B' }}>
-          {pts}/60 pts — {pts === 60 ? '¡Interface perfecta!' : `${(60 - pts) / 10} tipo(s) incorrecto(s).`}
-        </p>
-      )}
-    </div>
-  )
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function CleanCodePage() {
+  useScrollToTop()
   const [ex1Score, setEx1Score] = useState<number | null>(null)
   const [ex2Score, setEx2Score] = useState<number | null>(null)
-  const [ex3Score, setEx3Score] = useState<number | null>(null)
 
-  const totalScore = (ex1Score ?? 0) + (ex2Score ?? 0) + (ex3Score ?? 0)
-  const allDone = ex1Score !== null && ex2Score !== null && ex3Score !== null
+  const totalScore = (ex1Score ?? 0) + (ex2Score ?? 0)
+  const allDone = ex1Score !== null && ex2Score !== null
 
   return (
     <AboutPageLayout
@@ -495,7 +393,7 @@ export function CleanCodePage() {
         <GlassCard className="p-6">
           <ChallengeCard
             number={1}
-            total={3}
+            total={2}
             title="Nombra la función y sus parámetros"
             context={
               <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
@@ -516,7 +414,7 @@ export function CleanCodePage() {
               <GlassCard className="p-6">
                 <ChallengeCard
                   number={2}
-                  total={3}
+                  total={2}
                   title="Encuentra las violaciones SOLID"
                   context={
                     <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
@@ -533,47 +431,20 @@ export function CleanCodePage() {
           )}
         </AnimatePresence>
 
-        {/* Exercise 3 — unlocks after ex2 */}
-        <AnimatePresence>
-          {ex2Score !== null && (
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <GlassCard className="p-6">
-                <ChallengeCard
-                  number={3}
-                  total={3}
-                  title="Tipado estricto con TypeScript"
-                  context={
-                    <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
-                      Completa la interfaz para un ítem de venta. Elige el tipo correcto para cada campo.
-                    </span>
-                  }
-                  question="¿Qué tipo TypeScript corresponde a cada campo de SaleItem?"
-                  points={60}
-                >
-                  <Ex3 onComplete={setEx3Score} />
-                </ChallengeCard>
-              </GlassCard>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* ScoreBoard */}
         <AnimatePresence>
           {allDone && (
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <ScoreBoard
                 userScore={totalScore}
-                maxScore={180}
-                gianScore={180}
+                maxScore={120}
+                gianScore={120}
                 feedback={FEEDBACK}
                 gianComment="En RADAR aplico exactamente esto. El módulo de Abastecimiento tiene interfaces TypeScript para cada DTO, nombres descriptivos en cada variable y cada función del servicio hace exactamente una cosa. Cuando revisé el código después de 3 meses, lo entendí en minutos."
                 onReset={() => {
                   setEx1Score(null)
                   setEx2Score(null)
-                  setEx3Score(null)
                 }}
-                onNext={() => { window.location.href = '/sobre-mi/atencion-al-detalle' }}
-                nextLabel="Siguiente: Atención al detalle →"
               />
             </motion.div>
           )}
