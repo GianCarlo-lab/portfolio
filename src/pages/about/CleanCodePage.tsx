@@ -1,639 +1,585 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, XCircle, AlertCircle, RotateCcw } from 'lucide-react'
+import { Quote } from 'lucide-react'
 import { AboutPageLayout } from './AboutPageLayout'
-import { useScrollToTop } from '@/hooks/useScrollToTop'
+import { ChallengeCard } from '@/components/common/ChallengeCard/ChallengeCard'
+import { ScoreBoard } from '@/components/common/ScoreBoard/ScoreBoard'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
+import type { FeedbackRange } from '@/components/common/ScoreBoard/ScoreBoard'
 
-// ─── Challenge data ───────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────
 
-interface ChallengeOption {
+interface Slot {
   id: string
   label: string
-  feedback: string
-  score: number
-  codeAfter?: string
+  value: string | null
 }
 
-interface Challenge {
-  id: number
-  title: string
-  context: string
-  question: string
-  options: ChallengeOption[]
-}
-
-const CHALLENGES: Challenge[] = [
-  {
-    id: 0,
-    title: 'Desafío 1 — Nombres de variables',
-    context: `function procesar(d, arr) {
-  let r = 0
-  for(let i = 0; i < arr.length; i++) {
-    r += arr[i] * d
-  }
-  return r
-}`,
-    question: '¿Cómo mejorarías esta función?',
-    options: [
-      {
-        id: 'A',
-        label: 'Agregar comentarios explicando qué hace',
-        feedback:
-          'Parcialmente correcto. Los comentarios ayudan, pero no resuelven el problema raíz: los nombres sin significado. Un buen nombre elimina la necesidad del comentario.',
-        score: 10,
-      },
-      {
-        id: 'B',
-        label: 'Renombrar todo con nombres descriptivos',
-        feedback:
-          'Correcto. calculateWeightedTotal(discount, prices) es infinitamente más legible. El buen código se documenta solo.',
-        score: 30,
-        codeAfter: `function calculateWeightedTotal(
-  discount: number,
-  prices: number[]
-): number {
-  let total = 0
-  for (const price of prices) {
-    total += price * discount
-  }
-  return total
-}`,
-      },
-      {
-        id: 'C',
-        label: 'Está bien así, es más corto',
-        feedback:
-          'Error común. La brevedad no es virtud cuando sacrifica legibilidad. Otro dev (o tú en 6 meses) no entenderá esto.',
-        score: 0,
-      },
-    ],
-  },
-  {
-    id: 1,
-    title: 'Desafío 2 — Responsabilidad única',
-    context: `function handleUser(user, db, email, log) {
-  db.save(user)
-  email.send(user.email, 'Bienvenido')
-  log.write('Usuario creado: ' + user.id)
-  return { success: true }
-}`,
-    question: 'Esta función tiene múltiples responsabilidades. ¿Qué harías?',
-    options: [
-      {
-        id: 'A',
-        label: 'Separarla en: saveUser, sendWelcomeEmail, logUserCreation',
-        feedback:
-          'Principio de Responsabilidad Única (SRP). Cada función hace UNA cosa. Fácil de testear, mantener y reusar.',
-        score: 30,
-      },
-      {
-        id: 'B',
-        label: 'Está bien, es más eficiente tenerlo junto',
-        feedback:
-          'Si cambia la lógica de email, tienes que tocar la función de usuario. Alto acoplamiento = deuda técnica garantizada.',
-        score: 0,
-      },
-      {
-        id: 'C',
-        label: 'Agregar más parámetros para hacerla más flexible',
-        feedback:
-          'Más parámetros = más complejidad. La solución es dividir, no expandir. Una función con 6+ parámetros es una señal de diseño deficiente.',
-        score: 5,
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Desafío 3 — TypeScript y contratos',
-    context: `function getUser(id) {
-  // retorna un objeto usuario o null
-}`,
-    question: '¿Cómo mejorarías el contrato de esta función?',
-    options: [
-      {
-        id: 'A',
-        label: 'Agregar JSDoc con @param y @returns',
-        feedback:
-          'JSDoc es útil pero no es verificado por el compilador. Si el tipo cambia, el JSDoc puede quedar desactualizado silenciosamente.',
-        score: 10,
-      },
-      {
-        id: 'B',
-        label: 'Usar TypeScript: getUser(id: string): Promise<User | null>',
-        feedback:
-          'El compilador verifica los tipos en tiempo de desarrollo. Si User cambia, TypeScript te avisa en todos los puntos de uso automáticamente.',
-        score: 30,
-        codeAfter: `interface User {
+interface DndOption {
   id: string
-  name: string
-  email: string
+  label: string
 }
 
-async function getUser(
-  id: string
-): Promise<User | null> {
-  return db.findById(id) ?? null
-}`,
-      },
-      {
-        id: 'C',
-        label: 'No es necesario, JavaScript es suficiente',
-        feedback:
-          'En proyectos grandes sin tipos, los bugs de tipo son los más difíciles de encontrar en producción. Un tipo mal asumido puede costar horas.',
-        score: 0,
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: "Desafío 4 — DRY: Don't Repeat Yourself",
-    context: `function calcTotalVentas(items) {
-  return items.reduce(
-    (s, i) => s + i.precio * i.qty, 0
-  )
-}
-function calcTotalCompras(items) {
-  return items.reduce(
-    (s, i) => s + i.precio * i.qty, 0
-  )
-}`,
-    question: '¿Ves el problema? ¿Qué harías?',
-    options: [
-      {
-        id: 'A',
-        label: 'Crear una función genérica calculateTotal(items)',
-        feedback:
-          'DRY en acción. Un solo cambio afecta ambos casos. Si hay un bug, se corrige en un solo lugar, no en cada copia.',
-        score: 30,
-        codeAfter: `function calculateTotal(
-  items: { precio: number; qty: number }[]
-): number {
-  return items.reduce(
-    (sum, item) => sum + item.precio * item.qty,
-    0
-  )
+// ── Data ────────────────────────────────────────────────────────────────────
+
+const BLANK_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
+
+const CORRECT_MAP: Record<string, string> = {
+  A: 'calculateWeightedTotal',
+  B: 'discount',
+  C: 'prices',
+  D: 'validPrices',
+  E: 'sum',
+  F: 'price',
 }
 
-const totalVentas = calculateTotal(ventas)
-const totalCompras = calculateTotal(compras)`,
-      },
-      {
-        id: 'B',
-        label: 'Dejarlas separadas para mayor claridad',
-        feedback:
-          'Cuando corrijas un bug en una, debes recordar corregirlo en la otra. Y en la siguiente. Eso es deuda técnica garantizada.',
-        score: 0,
-      },
-      {
-        id: 'C',
-        label: 'Copiar y pegar siempre que sea necesario',
-        feedback:
-          'Copy-paste es el origen del 80% de la deuda técnica. Cada copia es un lugar más donde puede vivir un bug.',
-        score: 0,
-      },
-    ],
-  },
-  {
-    id: 4,
-    title: 'Desafío 5 — Manejo de errores',
-    context: `async function fetchData(url) {
-  const res = await fetch(url)
-  const data = await res.json()
-  return data
-}`,
-    question: '¿Qué problema crítico tiene esto?',
-    options: [
-      {
-        id: 'A',
-        label: 'Falta manejo de errores con try/catch',
-        feedback:
-          'Si fetch falla o la respuesta no es JSON válido, toda la aplicación puede crashear. El manejo de errores no es opcional en producción.',
-        score: 30,
-        codeAfter: `async function fetchData<T>(
-  url: string
-): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(\`HTTP \${res.status}: \${url}\`)
-  }
-  return res.json() as Promise<T>
-}`,
-      },
-      {
-        id: 'B',
-        label: 'Nada, funciona correctamente',
-        feedback:
-          'Funciona en el happy path. Pero en producción las redes fallan, las APIs devuelven HTML en vez de JSON, los servidores se caen.',
-        score: 0,
-      },
-      {
-        id: 'C',
-        label: 'Solo falta un console.log para debuggear',
-        feedback:
-          'El console.log no salva a los usuarios cuando la app crashea. Y dejar logs en producción es una mala práctica de seguridad.',
-        score: 5,
-      },
-    ],
-  },
+const ALL_OPTIONS: DndOption[] = [
+  { id: 'calculateWeightedTotal', label: 'calculateWeightedTotal' },
+  { id: 'discount', label: 'discount' },
+  { id: 'prices', label: 'prices' },
+  { id: 'validPrices', label: 'validPrices' },
+  { id: 'sum', label: 'sum' },
+  { id: 'price', label: 'price' },
+  { id: 'calc', label: 'calc' },
+  { id: 'd', label: 'd' },
+  { id: 'arr', label: 'arr' },
+  { id: 'r', label: 'r' },
+  { id: 's', label: 's' },
+  { id: 'x', label: 'x' },
 ]
 
-const RESULT_LEVELS = [
-  {
-    min: 0,
-    max: 50,
-    title: 'Sigue practicando',
-    message:
-      'El clean code se aprende con tiempo y experiencia. Cada proyecto es una oportunidad de mejorar.',
-    color: '#F59E0B',
-    emoji: '📖',
-  },
-  {
-    min: 51,
-    max: 99,
-    title: 'Buen nivel',
-    message:
-      'Tienes buenas bases, sigue refinando tu criterio. La diferencia está en los detalles.',
-    color: '#06B6D4',
-    emoji: '🎯',
-  },
-  {
-    min: 100,
-    max: 130,
-    title: 'Excelente',
-    message:
-      'Piensas como un desarrollador que cuida su código. Este nivel marca la diferencia en equipos.',
-    color: '#10B981',
-    emoji: '✨',
-  },
-  {
-    min: 131,
-    max: 999,
-    title: 'Clean Coder',
-    message:
-      'Compartes la misma filosofía que aplico en cada proyecto. El código limpio no es un extra, es el estándar.',
-    color: '#6366F1',
-    emoji: '🏆',
-  },
+const SOLID_LINES = [
+  { id: 1, code: "  const order = db.find(orderId)", correct: false },
+  { id: 2, code: "  order.status = 'processed'", correct: false },
+  { id: 3, code: "  db.save(order)", correct: false },
+  { id: 4, code: "  email.send(order.userId, 'Tu pedido...')", correct: true },
+  { id: 5, code: "  pdf.generate(order)", correct: true },
+  { id: 6, code: "  log.write('Order: ' + orderId)", correct: true },
+  { id: 7, code: "  return order", correct: false },
 ]
 
-function getResultLevel(score: number) {
-  return RESULT_LEVELS.find((l) => score >= l.min && score <= l.max) ?? RESULT_LEVELS[0]
-}
+const TS_FIELDS = [
+  { id: 'A', label: 'productId', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'string' },
+  { id: 'B', label: 'name', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'string' },
+  { id: 'C', label: 'quantity', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'number' },
+  { id: 'D', label: 'unitPrice', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'number' },
+  { id: 'E', label: 'isActive', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'boolean' },
+  { id: 'F', label: 'createdAt', options: ['string', 'number', 'boolean', 'Date'] as const, correct: 'Date' },
+]
 
-// ─── Simulator ────────────────────────────────────────────────────────────────
+const FEEDBACK: FeedbackRange[] = [
+  { range: [0, 60], message: "Bien comienzo. Los nombres importan más de lo que parece — cada variable que lees es un contrato con el siguiente dev.", color: '#F59E0B' },
+  { range: [61, 120], message: "Buen ojo. Estás aplicando principios reales. Con práctica constante esto se vuelve instintivo.", color: '#06B6D4' },
+  { range: [121, 160], message: "Sólido. Escribes código que se explica a sí mismo. Eso ahorra horas de debug a futuro.", color: '#10B981' },
+  { range: [161, 180], message: "Excelente. Tu código habla por sí solo. Eso es lo que separa a un dev bueno de uno excelente.", color: '#6366F1' },
+]
 
-interface SimState {
-  currentChallenge: number
-  score: number
-  selectedOption: ChallengeOption | null
-  completed: boolean
-}
+// ── Exercise 1: Drag & Drop rename ──────────────────────────────────────────
 
-function DecisionSimulator() {
-  const [state, setState] = useState<SimState>({
-    currentChallenge: 0,
-    score: 0,
-    selectedOption: null,
-    completed: false,
-  })
+function Ex1({ onComplete }: { onComplete: (pts: number) => void }) {
+  const initialSlots: Slot[] = BLANK_LABELS.map(id => ({ id, label: id, value: null }))
+  const [slots, setSlots] = useState<Slot[]>(initialSlots)
+  const [pool, setPool] = useState<DndOption[]>(ALL_OPTIONS)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [shaking, setShaking] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [pts, setPts] = useState(0)
 
-  const challenge = CHALLENGES[state.currentChallenge]
+  const placeOption = useCallback((slotId: string, optionId: string) => {
+    const option = ALL_OPTIONS.find(o => o.id === optionId)
+    if (!option) return
+    const correct = CORRECT_MAP[slotId] === optionId
 
-  const handleSelect = (opt: ChallengeOption) => {
-    if (state.selectedOption) return
-    setState((s) => ({ ...s, selectedOption: opt }))
+    if (!correct) {
+      setShaking(slotId)
+      setTimeout(() => setShaking(null), 600)
+      setPool(p => p.some(o => o.id === optionId) ? p : [...p, option])
+      return
+    }
+
+    setSlots(prev => prev.map(s => s.id === slotId ? { ...s, value: optionId } : s))
+    setPool(p => p.filter(o => o.id !== optionId))
+  }, [])
+
+  const handleDrop = (slotId: string) => {
+    if (!dragging) return
+    placeOption(slotId, dragging)
+    setDragging(null)
   }
 
-  const handleNext = () => {
-    const addedScore = state.selectedOption?.score ?? 0
-    const isLast = state.currentChallenge === CHALLENGES.length - 1
-    setState((s) => ({
-      currentChallenge: isLast ? s.currentChallenge : s.currentChallenge + 1,
-      score: s.score + addedScore,
-      selectedOption: null,
-      completed: isLast,
-    }))
+  const handleSlotClick = (slotId: string) => {
+    if (submitted) return
+    if (slots.find(s => s.id === slotId)?.value) return
+    if (!selected) return
+    placeOption(slotId, selected)
+    setSelected(null)
   }
 
-  const handleReset = () =>
-    setState({ currentChallenge: 0, score: 0, selectedOption: null, completed: false })
+  const handleSubmit = () => {
+    let score = 0
+    slots.forEach(s => {
+      if (s.value && CORRECT_MAP[s.id] === s.value) score += 10
+    })
+    setPts(score)
+    setSubmitted(true)
+    onComplete(score)
+  }
 
-  const finalScore = state.score + (state.selectedOption?.score ?? 0)
-  const result = getResultLevel(finalScore)
+  const allFilled = slots.every(s => s.value !== null)
 
-  if (state.completed && state.selectedOption !== null) {
+  const renderSlot = (id: string) => {
+    const slot = slots.find(s => s.id === id)!
+    const val = slot.value
+    const isCorrect = val && CORRECT_MAP[id] === val
+    const color = submitted ? (isCorrect ? '#10B981' : '#EF4444') : '#6366F1'
+    const isShaking = shaking === id
+
     return (
-      <motion.div
-        key="result"
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center gap-6 py-10 text-center"
+      <motion.span
+        key={id}
+        animate={isShaking ? { x: [-3, 3, -3, 3, 0] } : {}}
+        transition={{ duration: 0.3 }}
+        onDragOver={(e) => { e.preventDefault() }}
+        onDrop={() => handleDrop(id)}
+        onClick={() => handleSlotClick(id)}
+        style={{
+          display: 'inline-block',
+          minWidth: val ? 'auto' : 100,
+          padding: '1px 8px',
+          borderRadius: 6,
+          border: `1px dashed ${val ? color : 'rgba(99,102,241,0.4)'}`,
+          color: val ? color : 'rgba(99,102,241,0.6)',
+          cursor: selected && !val ? 'pointer' : 'default',
+          background: val ? `${color}18` : 'rgba(99,102,241,0.06)',
+          fontWeight: val ? 600 : 400,
+          verticalAlign: 'middle',
+        }}
       >
-        <div
-          className="w-24 h-24 rounded-full flex flex-col items-center justify-center"
-          style={{ background: `${result.color}15`, border: `2px solid ${result.color}40` }}
-        >
-          <span className="text-2xl">{result.emoji}</span>
-          <span className="text-xl font-black" style={{ color: result.color }}>
-            {finalScore}
-          </span>
-        </div>
-        <div>
-          <h3 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            {result.title}
-          </h3>
-          <p className="text-[var(--color-text-secondary)] max-w-md leading-relaxed">
-            {result.message}
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap justify-center">
-          {RESULT_LEVELS.map((l) => (
-            <div
-              key={l.title}
-              className="px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                background: finalScore >= l.min && finalScore <= l.max ? `${l.color}20` : 'rgba(255,255,255,0.04)',
-                color: finalScore >= l.min && finalScore <= l.max ? l.color : 'var(--color-text-muted)',
-                border: `1px solid ${finalScore >= l.min && finalScore <= l.max ? l.color + '40' : 'transparent'}`,
-              }}
-            >
-              {l.min}–{l.max === 999 ? '150' : l.max}: {l.title}
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] transition-all"
-        >
-          <RotateCcw size={14} />
-          Intentar de nuevo
-        </button>
-      </motion.div>
+        {val ?? `___${id}___`}
+      </motion.span>
     )
   }
 
-  const scoreForOpt = (opt: ChallengeOption) =>
-    opt.score === 30 ? '#10B981' : opt.score === 0 ? '#EF4444' : '#F59E0B'
-
   return (
-    <div className="flex flex-col gap-4">
-      {/* Progress bar */}
-      <div className="flex items-center gap-3 mb-1">
-        <div className="flex gap-1.5 flex-1">
-          {CHALLENGES.map((_, i) => (
-            <div
-              key={i}
-              className="h-1 rounded-full transition-all duration-300"
-              style={{
-                flex: i === state.currentChallenge ? 3 : 1,
-                background:
-                  i < state.currentChallenge
-                    ? '#6366F1'
-                    : i === state.currentChallenge
-                    ? '#6366F1'
-                    : 'rgba(255,255,255,0.1)',
-              }}
-            />
-          ))}
-        </div>
-        <span className="text-xs text-[var(--color-text-muted)] whitespace-nowrap">
-          {state.currentChallenge + 1} / {CHALLENGES.length}
-        </span>
-        <span className="text-xs font-bold whitespace-nowrap" style={{ color: '#6366F1' }}>
-          {state.score} pts
-        </span>
+    <div className="flex flex-col gap-5">
+      <GlassCard className="p-5">
+        <pre className="text-sm leading-loose overflow-x-auto whitespace-pre-wrap">
+          <span style={{ color: '#8B5CF6' }}>function </span>{renderSlot('A')}<span style={{ color: 'var(--color-text-secondary)' }}>(</span>{renderSlot('B')}<span style={{ color: 'var(--color-text-secondary)' }}>, </span>{renderSlot('C')}<span style={{ color: 'var(--color-text-secondary)' }}>{') {'}</span>{'\n'}
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'  '}</span><span style={{ color: '#06B6D4' }}>const </span>{renderSlot('D')}<span style={{ color: 'var(--color-text-secondary)' }}> = </span><span style={{ color: 'var(--color-text-secondary)' }}>prices</span><span style={{ color: 'var(--color-text-secondary)' }}>.filter(Boolean)</span>{'\n'}
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'  '}</span><span style={{ color: '#06B6D4' }}>return </span>{renderSlot('D')}<span style={{ color: 'var(--color-text-secondary)' }}>.reduce((</span>{renderSlot('E')}<span style={{ color: 'var(--color-text-secondary)' }}>, </span>{renderSlot('F')}<span style={{ color: 'var(--color-text-secondary)' }}>{') => '}</span>{renderSlot('E')}<span style={{ color: 'var(--color-text-secondary)' }}> + </span>{renderSlot('F')}<span style={{ color: 'var(--color-text-secondary)' }}> * </span>{renderSlot('B')}<span style={{ color: 'var(--color-text-secondary)' }}>, 0)</span>{'\n'}
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'}'}</span>
+        </pre>
+      </GlassCard>
+
+      {/* Option pool */}
+      <div className="flex flex-wrap gap-2">
+        {pool.map(opt => (
+          <motion.span
+            key={opt.id}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            draggable
+            onDragStart={() => setDragging(opt.id)}
+            onDragEnd={() => setDragging(null)}
+            onClick={() => setSelected(selected === opt.id ? null : opt.id)}
+            className="px-3 py-1.5 rounded-lg text-sm font-mono font-medium cursor-grab select-none transition-all"
+            style={{
+              background: selected === opt.id ? 'rgba(99,102,241,0.25)' : 'rgba(99,102,241,0.1)',
+              border: `1px solid ${selected === opt.id ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.3)'}`,
+              color: '#A5B4FC',
+            }}
+          >
+            {opt.label}
+          </motion.span>
+        ))}
+        {pool.length === 0 && !submitted && (
+          <p className="text-xs text-[var(--color-text-muted)] italic">Todos los espacios asignados.</p>
+        )}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={state.currentChallenge}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.22 }}
-          className="flex flex-col gap-4"
+      {selected && (
+        <p className="text-xs text-[var(--color-text-muted)] italic">
+          Seleccionado: <span style={{ color: '#6366F1' }} className="font-semibold">{selected}</span> — haz click en un espacio en blanco para colocarlo.
+        </p>
+      )}
+
+      {!submitted && allFilled && (
+        <button
+          onClick={handleSubmit}
+          className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+          style={{ background: '#6366F1' }}
         >
-          {/* Code context */}
-          <GlassCard className="p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">
-              {challenge.title}
-            </p>
-            <pre
-              className="text-sm leading-relaxed overflow-x-auto"
-              style={{
-                fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
-                color: 'var(--color-text-secondary)',
-                background: 'rgba(255,255,255,0.02)',
-                padding: '12px 14px',
-                borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.04)',
-              }}
-            >
-              {challenge.context}
-            </pre>
-          </GlassCard>
+          Confirmar nombres →
+        </button>
+      )}
 
-          {/* Question */}
-          <p className="font-semibold text-[var(--color-text-primary)] text-base">
-            {challenge.question}
-          </p>
-
-          {/* Options */}
-          <div className="flex flex-col gap-2">
-            {challenge.options.map((opt) => {
-              const isSelected = state.selectedOption?.id === opt.id
-              const isDisabled = state.selectedOption !== null && !isSelected
-              const color = state.selectedOption ? scoreForOpt(opt) : '#6366F1'
-
-              return (
-                <button
-                  key={opt.id}
-                  onClick={() => handleSelect(opt)}
-                  disabled={state.selectedOption !== null}
-                  className="text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-start gap-3"
-                  style={{
-                    background: isSelected ? `${scoreForOpt(opt)}12` : 'rgba(255,255,255,0.02)',
-                    borderColor: isSelected
-                      ? `${scoreForOpt(opt)}55`
-                      : isDisabled
-                      ? 'rgba(255,255,255,0.04)'
-                      : 'rgba(255,255,255,0.08)',
-                    opacity: isDisabled ? 0.4 : 1,
-                    cursor: isDisabled ? 'default' : 'pointer',
-                  }}
-                >
-                  <span
-                    className="text-xs font-bold mt-0.5 flex-shrink-0 w-5 h-5 rounded flex items-center justify-center"
-                    style={{
-                      background: isSelected ? `${scoreForOpt(opt)}25` : 'rgba(255,255,255,0.06)',
-                      color: isSelected ? scoreForOpt(opt) : color,
-                    }}
-                  >
-                    {opt.id}
-                  </span>
-                  <span className="text-sm text-[var(--color-text-primary)]">{opt.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Feedback */}
-          <AnimatePresence>
-            {state.selectedOption && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="flex flex-col gap-3 overflow-hidden"
-              >
-                <GlassCard className="p-4 flex gap-3">
-                  {state.selectedOption.score === 30 ? (
-                    <CheckCircle2 size={18} className="flex-shrink-0 text-emerald-400 mt-0.5" />
-                  ) : state.selectedOption.score === 0 ? (
-                    <XCircle size={18} className="flex-shrink-0 text-red-400 mt-0.5" />
-                  ) : (
-                    <AlertCircle size={18} className="flex-shrink-0 text-amber-400 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                      {state.selectedOption.feedback}
-                    </p>
-                    <p
-                      className="text-xs font-bold mt-1.5"
-                      style={{
-                        color:
-                          state.selectedOption.score === 30
-                            ? '#10B981'
-                            : state.selectedOption.score === 0
-                            ? '#EF4444'
-                            : '#F59E0B',
-                      }}
-                    >
-                      {state.selectedOption.score > 0
-                        ? `+${state.selectedOption.score} pts`
-                        : '+0 pts'}
-                    </p>
-                  </div>
-                </GlassCard>
-
-                {state.selectedOption.codeAfter && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                  >
-                    <GlassCard className="p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-2">
-                        Versión refactorizada
-                      </p>
-                      <pre
-                        className="text-sm leading-relaxed overflow-x-auto"
-                        style={{
-                          fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
-                          color: '#86EFAC',
-                          background: 'rgba(16,185,129,0.05)',
-                          padding: '12px 14px',
-                          borderRadius: 8,
-                          border: '1px solid rgba(16,185,129,0.15)',
-                        }}
-                      >
-                        {state.selectedOption.codeAfter}
-                      </pre>
-                    </GlassCard>
-                  </motion.div>
-                )}
-
-                <button
-                  onClick={handleNext}
-                  className="self-end px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
-                  style={{ background: '#6366F1' }}
-                >
-                  {state.currentChallenge === CHALLENGES.length - 1
-                    ? 'Ver resultado →'
-                    : 'Siguiente desafío →'}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </AnimatePresence>
+      {submitted && (
+        <p className="text-sm font-semibold" style={{ color: pts >= 50 ? '#10B981' : '#F59E0B' }}>
+          {pts === 60 ? '¡Perfecto! Todos los nombres son descriptivos y correctos.' : `${pts}/60 pts`}
+        </p>
+      )}
     </div>
   )
 }
 
-// ─── Principles ───────────────────────────────────────────────────────────────
+// ── Exercise 2: SOLID violations ────────────────────────────────────────────
 
-const PRINCIPLES = [
-  {
-    title: 'SOLID en la práctica',
-    description:
-      'SRP, OCP, LSP, ISP, DIP. No como reglas abstractas, sino como guías que aplico en los módulos ERP de RADAR.',
-    color: '#6366F1',
-  },
-  {
-    title: 'DRY siempre',
-    description:
-      'Cada función tiene un único propósito. Si copio y pego, me pregunto por qué no existe una abstracción adecuada.',
-    color: '#8B5CF6',
-  },
-  {
-    title: 'Naming que documenta',
-    description:
-      'getUsersByRole() no necesita comentario. Una variable llamada "data" necesita uno urgente.',
-    color: '#A78BFA',
-  },
-]
+function Ex2({ onComplete }: { onComplete: (pts: number) => void }) {
+  const [clicked, setClicked] = useState<Record<number, boolean>>({})
+  const [submitted, setSubmitted] = useState(false)
+  const [pts, setPts] = useState(0)
+  const [bonusEarned, setBonusEarned] = useState(false)
+  const [showRefactor, setShowRefactor] = useState(false)
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+  const handleLineClick = (lineId: number, correct: boolean) => {
+    if (submitted) return
+    if (clicked[lineId] !== undefined) return
+    setClicked(prev => ({ ...prev, [lineId]: correct }))
+  }
+
+  const handleSubmit = () => {
+    let score = 0
+    let noWrong = true
+    Object.entries(clicked).forEach(([, correct]) => {
+      if (correct) score += 15
+      else { score -= 5; noWrong = false }
+    })
+    const bonus = noWrong && Object.values(clicked).filter(Boolean).length === 3 ? 15 : 0
+    score = Math.max(0, score + bonus)
+    setBonusEarned(noWrong && bonus > 0)
+    setPts(score)
+    setSubmitted(true)
+    onComplete(score)
+  }
+
+  const selectedCount = Object.keys(clicked).length
+
+  return (
+    <div className="flex flex-col gap-5">
+      <GlassCard className="p-5">
+        <pre className="text-sm leading-loose overflow-x-auto">
+          <span style={{ color: '#8B5CF6' }}>function </span>
+          <span style={{ color: '#06B6D4' }}>processOrder</span>
+          <span style={{ color: 'var(--color-text-secondary)' }}>(orderId, db, email, pdf, log) {'{'}</span>
+          {SOLID_LINES.map(line => {
+            const state = clicked[line.id]
+            let bg = 'transparent'
+            let borderColor = 'transparent'
+            if (state === true && submitted) { bg = 'rgba(16,185,129,0.12)'; borderColor = '#10B981' }
+            if (state === false && submitted) { bg = 'rgba(239,68,68,0.12)'; borderColor = '#EF4444' }
+            if (state !== undefined && !submitted) { bg = 'rgba(99,102,241,0.12)'; borderColor = '#6366F1' }
+
+            return (
+              <div
+                key={line.id}
+                onClick={() => handleLineClick(line.id, line.correct)}
+                className="cursor-pointer rounded px-2 py-0.5 transition-all select-none"
+                style={{ background: bg, borderLeft: `3px solid ${borderColor}` }}
+              >
+                <span style={{ color: '#64748B', userSelect: 'none', marginRight: 12 }}>{line.id}</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>{line.code}</span>
+                {state !== undefined && !submitted && <span className="ml-2 text-xs" style={{ color: '#6366F1' }}>✓ seleccionada</span>}
+                {submitted && state === true && <span className="ml-2 text-xs" style={{ color: '#10B981' }}>+15pts ✓</span>}
+                {submitted && state === false && <span className="ml-2 text-xs" style={{ color: '#EF4444' }}>-5pts ✗</span>}
+              </div>
+            )
+          })}
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'}'}</span>
+        </pre>
+      </GlassCard>
+
+      {!submitted && (
+        <div className="flex items-center gap-4">
+          <p className="text-xs text-[var(--color-text-muted)]">{selectedCount} línea(s) seleccionada(s)</p>
+          {selectedCount > 0 && (
+            <button
+              onClick={handleSubmit}
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-all"
+              style={{ background: '#6366F1' }}
+            >
+              Confirmar selección →
+            </button>
+          )}
+        </div>
+      )}
+
+      {submitted && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold" style={{ color: pts >= 40 ? '#10B981' : '#F59E0B' }}>
+            {pts}pts{bonusEarned && ' + 15 bonus por precisión perfecta'}
+          </p>
+          <button
+            onClick={() => setShowRefactor(!showRefactor)}
+            className="self-start text-xs font-medium px-3 py-1.5 rounded-lg border transition-all"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            {showRefactor ? 'Ocultar' : 'Ver versión refactorizada →'}
+          </button>
+          <AnimatePresence>
+            {showRefactor && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                <GlassCard className="p-4">
+                  <pre className="text-xs leading-loose overflow-x-auto" style={{ color: 'var(--color-text-secondary)' }}>{`// Cada función hace UNA sola cosa
+function processOrder(orderId, db) {
+  const order = db.find(orderId)
+  order.status = 'processed'
+  db.save(order)
+  return order
+}
+
+function notifyUser(order, email) {
+  email.send(order.userId, 'Tu pedido...')
+}
+
+function generateDocument(order, pdf) {
+  pdf.generate(order)
+}
+
+function auditOrder(orderId, log) {
+  log.write('Order: ' + orderId)
+}`}</pre>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Exercise 3: TypeScript types ─────────────────────────────────────────────
+
+function Ex3({ onComplete }: { onComplete: (pts: number) => void }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [submitted, setSubmitted] = useState(false)
+  const [pts, setPts] = useState(0)
+
+  const handleSubmit = () => {
+    let score = 0
+    TS_FIELDS.forEach(f => {
+      if (answers[f.id] === f.correct) score += 10
+    })
+    setPts(score)
+    setSubmitted(true)
+    onComplete(score)
+  }
+
+  const allAnswered = TS_FIELDS.every(f => answers[f.id])
+
+  return (
+    <div className="flex flex-col gap-5">
+      <GlassCard className="p-5">
+        <pre className="text-sm leading-loose overflow-x-auto">
+          <span style={{ color: '#8B5CF6' }}>interface </span>
+          <span style={{ color: '#06B6D4' }}>SaleItem </span>
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'{'}</span>
+          {TS_FIELDS.map(f => {
+            const val = answers[f.id]
+            const isCorrect = val === f.correct
+            const color = submitted ? (isCorrect ? '#10B981' : '#EF4444') : '#6366F1'
+            return (
+              <div key={f.id} className="pl-4">
+                <span style={{ color: 'var(--color-text-secondary)' }}>{f.label}: </span>
+                <span style={{ color: val ? color : 'rgba(99,102,241,0.5)', fontWeight: val ? 600 : 400 }}>
+                  {val ?? `___${f.id}___`}
+                </span>
+                {submitted && <span className="ml-2 text-xs" style={{ color }}>{isCorrect ? '✓' : `✗ (${f.correct})`}</span>}
+              </div>
+            )
+          })}
+          <span style={{ color: 'var(--color-text-secondary)' }}>{'}'}</span>
+        </pre>
+      </GlassCard>
+
+      <div className="flex flex-col gap-3">
+        {TS_FIELDS.map(f => (
+          <div key={f.id} className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-mono text-[var(--color-text-muted)] w-24">{f.label}:</span>
+            <div className="flex gap-2 flex-wrap">
+              {f.options.map(opt => {
+                const isSelected = answers[f.id] === opt
+                const isCorrect = opt === f.correct
+                let bg = isSelected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)'
+                let borderCol = isSelected ? '#6366F1' : 'var(--color-border)'
+                if (submitted && isSelected && isCorrect) { bg = 'rgba(16,185,129,0.15)'; borderCol = '#10B981' }
+                if (submitted && isSelected && !isCorrect) { bg = 'rgba(239,68,68,0.15)'; borderCol = '#EF4444' }
+                if (submitted && !isSelected && isCorrect) { bg = 'rgba(16,185,129,0.08)'; borderCol = '#10B981' }
+
+                return (
+                  <button
+                    key={opt}
+                    disabled={submitted}
+                    onClick={() => setAnswers(prev => ({ ...prev, [f.id]: opt }))}
+                    className="px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all"
+                    style={{ background: bg, border: `1px solid ${borderCol}`, color: isSelected ? '#A5B4FC' : 'var(--color-text-secondary)' }}
+                  >
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {!submitted && allAnswered && (
+        <button
+          onClick={handleSubmit}
+          className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+          style={{ background: '#6366F1' }}
+        >
+          Verificar tipos →
+        </button>
+      )}
+
+      {submitted && (
+        <p className="text-sm font-semibold" style={{ color: pts >= 50 ? '#10B981' : '#F59E0B' }}>
+          {pts}/60 pts — {pts === 60 ? '¡Interface perfecta!' : `${(60 - pts) / 10} tipo(s) incorrecto(s).`}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export function CleanCodePage() {
-  useScrollToTop()
+  const [ex1Score, setEx1Score] = useState<number | null>(null)
+  const [ex2Score, setEx2Score] = useState<number | null>(null)
+  const [ex3Score, setEx3Score] = useState<number | null>(null)
+
+  const totalScore = (ex1Score ?? 0) + (ex2Score ?? 0) + (ex3Score ?? 0)
+  const allDone = ex1Score !== null && ex2Score !== null && ex3Score !== null
 
   return (
     <AboutPageLayout
       title="Clean Code"
-      description="El código limpio no es opcional. Es la diferencia entre un sistema que dura y uno que se convierte en deuda técnica."
+      description="El código limpio no es un lujo, es respeto por quienes vienen después — y por ti mismo seis meses más tarde."
       valueNumber="01"
       accentColor="#6366F1"
       nextPath="/sobre-mi/atencion-al-detalle"
       nextLabel="Atención al detalle"
     >
-      <section className="mb-12">
-        <p className="text-[var(--color-text-secondary)] text-lg leading-relaxed">
-          Escribir código que funciona es el mínimo esperado. Escribir código que otros puedan
-          leer, mantener y extender sin miedo — eso es lo que separa un desarrollador junior de uno
-          senior.
-        </p>
-      </section>
+      <div className="flex flex-col gap-10">
 
-      <section className="mb-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            ¿Cómo escribirías esto?
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            5 desafíos reales. Elige la mejor respuesta y ve por qué importa cada decisión.
+        {/* Quote */}
+        <div className="relative pl-6 py-1" style={{ borderLeft: '4px solid #6366F1' }}>
+          <p className="text-[var(--color-text-secondary)] leading-relaxed italic">
+            "En el módulo de Abastecimiento de RADAR, heredé funciones de 80 líneas con variables como{' '}
+            <code className="not-italic font-mono text-xs px-1 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#A5B4FC' }}>d</code>,{' '}
+            <code className="not-italic font-mono text-xs px-1 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#A5B4FC' }}>arr</code>,{' '}
+            <code className="not-italic font-mono text-xs px-1 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#A5B4FC' }}>r</code>.
+            Tardé 3 días en entender qué hacían. Cuando las reescribí con nombres descriptivos, el siguiente desarrollador lo entendió en 20 minutos.
+            Esa diferencia es lo que me enseñó que el clean code no es vanidad, es productividad real."
           </p>
+          <p className="text-xs font-semibold mt-3" style={{ color: '#6366F1' }}>— Gian, módulo Abastecimiento, RADAR ERP</p>
+          <Quote size={16} className="absolute top-1 right-0 opacity-20" style={{ color: '#6366F1' }} />
         </div>
-        <DecisionSimulator />
-      </section>
 
-      <section>
-        <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-6">
-          Principios que aplico en cada proyecto
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {PRINCIPLES.map((p) => (
-            <GlassCard key={p.title} className="p-5">
-              <div className="w-8 h-1 rounded-full mb-4" style={{ background: p.color }} />
-              <h3 className="font-bold text-[var(--color-text-primary)] mb-2">{p.title}</h3>
-              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                {p.description}
-              </p>
-            </GlassCard>
+        {/* Philosophy pills */}
+        <div className="flex flex-wrap gap-2">
+          {['Nombres que documentan', 'Una función, una responsabilidad', 'TypeScript siempre'].map(p => (
+            <span
+              key={p}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: 'rgba(99,102,241,0.12)', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.25)' }}
+            >
+              {p}
+            </span>
           ))}
         </div>
-      </section>
+
+        {/* Exercise 1 */}
+        <GlassCard className="p-6">
+          <ChallengeCard
+            number={1}
+            total={3}
+            title="Nombra la función y sus parámetros"
+            context={
+              <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                Esta función existe en producción. Los nombres originales son inútiles. Arrastra (o haz click) las opciones correctas a cada espacio.
+              </span>
+            }
+            question="¿Qué nombre descriptivo le darías a cada variable?"
+            points={60}
+          >
+            <Ex1 onComplete={setEx1Score} />
+          </ChallengeCard>
+        </GlassCard>
+
+        {/* Exercise 2 — unlocks after ex1 */}
+        <AnimatePresence>
+          {ex1Score !== null && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <GlassCard className="p-6">
+                <ChallengeCard
+                  number={2}
+                  total={3}
+                  title="Encuentra las violaciones SOLID"
+                  context={
+                    <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                      Esta función mezcla lógica de negocio, persistencia, notificaciones y auditoría.
+                    </span>
+                  }
+                  question="Haz click en las líneas que violan el Principio de Responsabilidad Única (SRP) — las que debería manejar otra función."
+                  points={60}
+                >
+                  <Ex2 onComplete={setEx2Score} />
+                </ChallengeCard>
+              </GlassCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Exercise 3 — unlocks after ex2 */}
+        <AnimatePresence>
+          {ex2Score !== null && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <GlassCard className="p-6">
+                <ChallengeCard
+                  number={3}
+                  total={3}
+                  title="Tipado estricto con TypeScript"
+                  context={
+                    <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                      Completa la interfaz para un ítem de venta. Elige el tipo correcto para cada campo.
+                    </span>
+                  }
+                  question="¿Qué tipo TypeScript corresponde a cada campo de SaleItem?"
+                  points={60}
+                >
+                  <Ex3 onComplete={setEx3Score} />
+                </ChallengeCard>
+              </GlassCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ScoreBoard */}
+        <AnimatePresence>
+          {allDone && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <ScoreBoard
+                userScore={totalScore}
+                maxScore={180}
+                gianScore={180}
+                feedback={FEEDBACK}
+                gianComment="En RADAR aplico exactamente esto. El módulo de Abastecimiento tiene interfaces TypeScript para cada DTO, nombres descriptivos en cada variable y cada función del servicio hace exactamente una cosa. Cuando revisé el código después de 3 meses, lo entendí en minutos."
+                onReset={() => {
+                  setEx1Score(null)
+                  setEx2Score(null)
+                  setEx3Score(null)
+                }}
+                onNext={() => { window.location.href = '/sobre-mi/atencion-al-detalle' }}
+                nextLabel="Siguiente: Atención al detalle →"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+      </div>
     </AboutPageLayout>
   )
 }

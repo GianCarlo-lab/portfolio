@@ -1,766 +1,582 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2 } from 'lucide-react'
+import { Quote, Timer, Eye, Check } from 'lucide-react'
 import { AboutPageLayout } from './AboutPageLayout'
-import { useScrollToTop } from '@/hooks/useScrollToTop'
+import { ChallengeCard } from '@/components/common/ChallengeCard/ChallengeCard'
+import { ScoreBoard } from '@/components/common/ScoreBoard/ScoreBoard'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
-import { useIntersectionObserver } from '@/hooks/useIntersectionObserver'
+import type { FeedbackRange } from '@/components/common/ScoreBoard/ScoreBoard'
 
-// ─── UI Inspector ─────────────────────────────────────────────────────────────
+// ── Data ────────────────────────────────────────────────────────────────────
 
-interface ErrorDef {
-  id: number
-  label: string
-  tooltip: string
-}
-
-const ERRORS: ErrorDef[] = [
-  {
-    id: 0,
-    label: 'Título',
-    tooltip: 'Font size fuera del sistema tipográfico. Usa múltiplos de 2: 16, 18, 20, 24px. Este tiene 19px.',
-  },
-  {
-    id: 1,
-    label: 'Descripción',
-    tooltip: 'Line-height muy bajo para texto de párrafo. Mínimo 1.5 para buena legibilidad. Este tiene 1.3.',
-  },
-  {
-    id: 2,
-    label: 'Precio',
-    tooltip: 'Alineación inconsistente. Todo el contenido está alineado a la izquierda, el precio está a la derecha.',
-  },
-  {
-    id: 3,
-    label: 'Botón Agregar',
-    tooltip: 'Padding inconsistente (10px 14px) vs "Ver más" (10px 20px). Los botones del mismo nivel deben ser iguales.',
-  },
-  {
-    id: 4,
-    label: 'Botón Ver más',
-    tooltip: 'Border-radius diferente: 6px aquí, 8px en "Agregar". Usa un valor único en todo el sistema.',
-  },
-  {
-    id: 5,
-    label: 'Imagen',
-    tooltip: 'Aspect-ratio incorrecto. La imagen está ligeramente estirada. Usa object-fit: cover siempre.',
-  },
+const ERRORS = [
+  { id: 1, label: "Indentación inconsistente en nav", detail: "Clientes está desalineado 4px respecto a los demás ítems." },
+  { id: 2, label: "Stat cards de diferente altura", detail: "La card de 'Ingresos' mide 92px y la de 'Pedidos' 104px." },
+  { id: 3, label: "Formato de moneda inconsistente", detail: "'S/. 12k' vs 'S/.120' — sin espacio y sin formato unificado." },
+  { id: 4, label: "Padding diferente por fila en tabla", detail: "Fila 1: py-3, Fila 2: py-2, Fila 3: py-3. No es consistente." },
+  { id: 5, label: "Peso tipográfico inconsistente en estado", detail: "'Pagado' en bold, 'Pendiente' en regular. Mismo componente." },
+  { id: 6, label: "Header desalineado con el contenido", detail: "'Dashboard' tiene padding-left: 24px, el contenido usa 20px." },
+  { id: 7, label: "Íconos de diferente tamaño en header", detail: "Ícono Perfil: 20px, ícono Menu: 22px." },
 ]
 
-interface ErrorZoneProps {
-  errorId: number
-  found: boolean[]
-  onFind: (id: number) => void
-  tooltip: string
-  children: ReactNode
-}
+const ACCENT_OPTIONS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444']
 
-function ErrorZone({ errorId, found, onFind, tooltip, children }: ErrorZoneProps) {
-  const [hovered, setHovered] = useState(false)
-  const isFound = found[errorId]
+const FEEDBACK: FeedbackRange[] = [
+  { range: [0, 40], message: "Buen ojo en entrenamiento. Con práctica empiezas a ver lo que el usuario siente pero no puede nombrar.", color: '#F59E0B' },
+  { range: [41, 80], message: "Estás notando más de lo que la mayoría. Eso es atención al detalle real.", color: '#06B6D4' },
+  { range: [81, 110], message: "Muy buen ojo clínico. Captas inconsistencias que afectan la percepción de calidad.", color: '#10B981' },
+  { range: [111, 130], message: "¡Ojo clínico perfecto! Encontraste todos los errores. Así se construye un producto premium.", color: '#6366F1' },
+]
 
-  return (
-    <div
-      className="relative"
-      style={{ cursor: isFound ? 'default' : 'pointer' }}
-      onMouseEnter={() => !isFound && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => !isFound && onFind(errorId)}
-    >
-      <div
-        style={{
-          outline: isFound
-            ? '2px solid rgba(16,185,129,0.5)'
-            : hovered
-            ? '2px dashed rgba(239,68,68,0.7)'
-            : '2px dashed transparent',
-          outlineOffset: 2,
-          borderRadius: 4,
-          transition: 'outline 0.15s',
-        }}
-      >
-        {children}
-      </div>
+// ── Exercise 1: Dashboard Inspector ─────────────────────────────────────────
 
-      {/* Found checkmark */}
-      <AnimatePresence>
-        {isFound && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-2 -right-2 z-20 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center"
-          >
-            <span className="text-white text-[10px] font-bold">✓</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+function DashboardInspector({ onComplete }: { onComplete: (pts: number) => void }) {
+  const [found, setFound] = useState<number[]>([])
+  const [wrong, setWrong] = useState<number[]>([])
+  const [seconds, setSeconds] = useState(0)
+  const [running, setRunning] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [pts, setPts] = useState(0)
+  const [shownDetail, setShownDetail] = useState<number | null>(null)
+  const [showFixed, setShowFixed] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-      {/* Hover tooltip */}
-      <AnimatePresence>
-        {hovered && !isFound && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.12 }}
-            className="absolute z-30 bottom-full left-0 mb-2 w-60 rounded-xl p-3 text-xs leading-relaxed pointer-events-none"
-            style={{
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              color: '#FCA5A5',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <p className="font-semibold text-red-300 mb-1">Haz clic para confirmar error</p>
-            {tooltip}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function UIInspector() {
-  const [found, setFound] = useState<boolean[]>(Array(6).fill(false))
-  const [lastFeedback, setLastFeedback] = useState<string | null>(null)
-  const [showCorrected, setShowCorrected] = useState(false)
-
-  const foundCount = found.filter(Boolean).length
-  const allFound = foundCount === 6
-
-  const handleFind = (id: number) => {
-    setFound((prev) => {
-      const next = [...prev]
-      next[id] = true
-      return next
-    })
-    setLastFeedback(ERRORS[id].tooltip)
+  const startTimer = () => {
+    if (running) return
+    setRunning(true)
+    intervalRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
   }
 
+  useEffect(() => {
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [])
+
+  const handleErrorClick = (id: number) => {
+    if (submitted) return
+    startTimer()
+    if (found.includes(id)) { setShownDetail(id); return }
+    const isError = ERRORS.some(e => e.id === id)
+    if (!isError) {
+      setWrong(prev => [...prev, id])
+      return
+    }
+    const newFound = [...found, id]
+    setFound(newFound)
+    setShownDetail(id)
+    if (newFound.length === ERRORS.length) {
+      finalize(newFound)
+    }
+  }
+
+  const finalize = (foundIds: number[]) => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    let score = 0
+    foundIds.forEach((_, i) => {
+      if (i < 3) score += 15
+      else if (i < 6) score += 20
+      else score += 25
+    })
+    const wrongPenalty = wrong.length * 5
+    score = Math.max(0, score - wrongPenalty)
+    setPts(score)
+    setSubmitted(true)
+    onComplete(score)
+  }
+
+  const handleSubmit = () => finalize(found)
+
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
+  const ss = String(seconds % 60).padStart(2, '0')
+
+  // Dashboard click zones (fake UI)
+  const zone = (id: number, children: React.ReactNode, className?: string, extraStyle?: React.CSSProperties) => (
+    <div
+      onClick={() => handleErrorClick(id)}
+      className={`relative cursor-pointer transition-all select-none ${className ?? ''}`}
+      style={{
+        ...extraStyle,
+        outline: found.includes(id)
+          ? '2px solid #10B981'
+          : shownDetail === id
+          ? '2px dashed #6366F1'
+          : 'none',
+        outlineOffset: 2,
+      }}
+      title={`Zona ${id}`}
+    >
+      {children}
+      {found.includes(id) && (
+        <span className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-xs z-10">
+          ✓
+        </span>
+      )}
+    </div>
+  )
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Pasa el cursor sobre los elementos con problemas y haz clic para confirmarlos.
-        </p>
-        <div
-          className="px-3 py-1.5 rounded-full text-sm font-semibold"
-          style={{
-            background: allFound ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)',
-            color: allFound ? '#10B981' : 'var(--color-text-secondary)',
-          }}
-        >
-          {foundCount} / 6 errores encontrados
+    <div className="flex flex-col gap-5">
+      {/* Timer + score */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+          <Timer size={14} />
+          <span className="font-mono">{mm}:{ss}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Eye size={14} style={{ color: '#6366F1' }} />
+          <span className="text-sm font-semibold" style={{ color: '#6366F1' }}>{found.length}/{ERRORS.length} errores</span>
+          {wrong.length > 0 && <span className="text-xs text-red-400">-{wrong.length * 5}pts por clicks incorrectos</span>}
         </div>
       </div>
 
-      {/* Card with errors */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        <AnimatePresence mode="wait">
-          {!showCorrected ? (
-            <motion.div
-              key="buggy"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="rounded-2xl overflow-hidden border border-[var(--color-border)] flex-shrink-0"
-              style={{ width: 300, background: 'rgba(19,19,31,0.9)' }}
-            >
-              {/* Image — Error 5: stretched */}
-              <ErrorZone errorId={5} found={found} onFind={handleFind} tooltip={ERRORS[5].tooltip}>
-                <div
-                  style={{
-                    height: 180,
-                    background: 'linear-gradient(135deg, #1e1e2e, #2a2a3e)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      background: 'linear-gradient(135deg, #2a2a3e 0%, #1e1e2e 100%)',
-                      transform: 'scaleX(1.15)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: 48, opacity: 0.25 }}>📷</span>
+      {/* Fake dashboard */}
+      <GlassCard className="p-0 overflow-hidden">
+        <div style={{ background: 'rgba(10,10,20,0.95)', borderRadius: 12 }}>
+          {/* Header */}
+          {zone(6,
+            <div className="flex items-center justify-between py-3 px-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <span className="font-bold text-[var(--color-text-primary)]" style={{ paddingLeft: 4 }}>Dashboard</span>
+              <div className="flex items-center gap-3">
+                {zone(7,
+                  <div className="flex gap-2">
+                    <div className="w-5 h-5 rounded bg-white/10" style={{ width: 20, height: 20 }} />
+                    <div className="rounded bg-white/10" style={{ width: 22, height: 20 }} />
                   </div>
-                </div>
-              </ErrorZone>
-
-              <div style={{ padding: 16 }}>
-                {/* Title — Error 0: 19px font */}
-                <ErrorZone errorId={0} found={found} onFind={handleFind} tooltip={ERRORS[0].tooltip}>
-                  <h3
-                    style={{
-                      fontSize: 19,
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                      marginBottom: 8,
-                    }}
-                  >
-                    Producto Premium
-                  </h3>
-                </ErrorZone>
-
-                {/* Description — Error 1: line-height 1.3 */}
-                <ErrorZone errorId={1} found={found} onFind={handleFind} tooltip={ERRORS[1].tooltip}>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      lineHeight: 1.3,
-                      color: 'var(--color-text-secondary)',
-                      marginBottom: 12,
-                    }}
-                  >
-                    Una descripción del producto que vende muy bien en la tienda en línea.
-                  </p>
-                </ErrorZone>
-
-                {/* Price — Error 2: right aligned */}
-                <ErrorZone errorId={2} found={found} onFind={handleFind} tooltip={ERRORS[2].tooltip}>
-                  <p
-                    style={{
-                      textAlign: 'right',
-                      fontSize: 18,
-                      fontWeight: 700,
-                      color: 'var(--color-text-primary)',
-                      marginBottom: 16,
-                    }}
-                  >
-                    S/. 29.99
-                  </p>
-                </ErrorZone>
-
-                {/* Buttons */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {/* Agregar — Error 3: padding 10px 14px */}
-                  <ErrorZone errorId={3} found={found} onFind={handleFind} tooltip={ERRORS[3].tooltip}>
-                    <button
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: 8,
-                        background: '#6366F1',
-                        color: 'white',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        border: 'none',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Agregar
-                    </button>
-                  </ErrorZone>
-
-                  {/* Ver más — Error 4: border-radius 6px */}
-                  <ErrorZone errorId={4} found={found} onFind={handleFind} tooltip={ERRORS[4].tooltip}>
-                    <button
-                      style={{
-                        padding: '10px 20px',
-                        borderRadius: 6,
-                        background: 'transparent',
-                        color: 'var(--color-text-primary)',
-                        fontSize: 14,
-                        fontWeight: 500,
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Ver más
-                    </button>
-                  </ErrorZone>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="corrected"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="rounded-2xl overflow-hidden border flex-shrink-0"
-              style={{ width: 300, background: 'rgba(19,19,31,0.9)', borderColor: 'rgba(16,185,129,0.3)' }}
-            >
-              <div
-                style={{
-                  height: 180,
-                  background: 'linear-gradient(135deg, #1e1e2e, #2a2a3e)',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span style={{ fontSize: 48, opacity: 0.35 }}>📷</span>
-              </div>
-              <div style={{ padding: 16 }}>
-                <h3
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: 'var(--color-text-primary)',
-                    marginBottom: 8,
-                  }}
-                >
-                  Producto Premium
-                </h3>
-                <p
-                  style={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: 'var(--color-text-secondary)',
-                    marginBottom: 12,
-                  }}
-                >
-                  Una descripción del producto que vende muy bien en la tienda en línea.
-                </p>
-                <p
-                  style={{
-                    textAlign: 'left',
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: 'var(--color-text-primary)',
-                    marginBottom: 16,
-                  }}
-                >
-                  S/. 29.99
-                </p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    style={{
-                      flex: 1,
-                      padding: '10px 18px',
-                      borderRadius: 8,
-                      background: '#6366F1',
-                      color: 'white',
-                      fontSize: 14,
-                      fontWeight: 500,
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Agregar
-                  </button>
-                  <button
-                    style={{
-                      flex: 1,
-                      padding: '10px 18px',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      color: 'var(--color-text-primary)',
-                      fontSize: 14,
-                      fontWeight: 500,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Ver más
-                  </button>
-                </div>
-              </div>
-              <div
-                className="px-4 py-2 text-xs font-semibold text-emerald-400 text-center"
-                style={{ background: 'rgba(16,185,129,0.08)', borderTop: '1px solid rgba(16,185,129,0.2)' }}
-              >
-                ✓ Todos los errores corregidos
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Feedback panel */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-            Errores a encontrar
-          </p>
-          {ERRORS.map((err) => (
-            <div
-              key={err.id}
-              className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200"
-              style={{
-                background: found[err.id] ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${found[err.id] ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.05)'}`,
-              }}
-            >
-              <div
-                className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                style={{
-                  background: found[err.id] ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.1)',
-                  border: `1px solid ${found[err.id] ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.3)'}`,
-                }}
-              >
-                {found[err.id] ? (
-                  <span className="text-emerald-400 text-[10px]">✓</span>
-                ) : (
-                  <span className="text-red-400 text-[10px] font-bold">?</span>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-xs font-semibold"
-                  style={{ color: found[err.id] ? '#10B981' : 'var(--color-text-secondary)' }}
-                >
-                  {err.label}
-                </p>
-                <AnimatePresence>
-                  {found[err.id] && (
-                    <motion.p
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      className="text-xs text-[var(--color-text-muted)] leading-relaxed mt-0.5 overflow-hidden"
+            </div>
+          )}
+
+          <div className="flex">
+            {/* Sidebar */}
+            <div className="w-36 py-4 border-r flex flex-col gap-1" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              {zone(1,
+                <div className="flex flex-col gap-1">
+                  {['Inicio', 'Ventas', 'Clientes', 'Reportes'].map((item, i) => (
+                    <div
+                      key={item}
+                      className="px-4 py-2 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                      style={{ paddingLeft: item === 'Clientes' ? 20 : 16 }}
                     >
-                      {err.tooltip}
-                    </motion.p>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Main content */}
+            <div className="flex-1 p-4 flex flex-col gap-4">
+              {/* Stat cards */}
+              <div className="flex gap-3">
+                {zone(2,
+                  <div className="flex-1 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', height: 92 }}>
+                    <p className="text-xs text-[var(--color-text-muted)]">Ingresos</p>
+                    {zone(3,
+                      <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1">S/. 12k</p>
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', height: 104 }}>
+                  <p className="text-xs text-[var(--color-text-muted)]">Pedidos</p>
+                  <p className="text-xl font-bold text-[var(--color-text-primary)] mt-1">S/.120</p>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div>
+                <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-2">Ventas recientes</p>
+                <div className="rounded-lg overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  {[
+                    { name: 'Producto A', amount: 'S/. 320', status: 'Pagado', py: 'py-3' },
+                    { name: 'Producto B', amount: 'S/. 180', status: 'Pendiente', py: 'py-2' },
+                    { name: 'Producto C', amount: 'S/. 540', status: 'Pagado', py: 'py-3' },
+                  ].map((row, i) =>
+                    zone(i === 1 ? 4 : (i === 0 ? 0 : 0),
+                      zone(5,
+                        <div className={`flex items-center justify-between px-3 text-xs ${row.py} border-b`} style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>{row.name}</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>{row.amount}</span>
+                          <span style={{ color: row.status === 'Pagado' ? '#10B981' : '#F59E0B', fontWeight: row.status === 'Pagado' ? 700 : 400 }}>{row.status}</span>
+                        </div>,
+                        undefined,
+                        { cursor: 'pointer' }
+                      ),
+                      undefined,
+                      { cursor: 'pointer' }
+                    )
                   )}
-                </AnimatePresence>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+      </GlassCard>
 
-          {allFound && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col gap-3 mt-2"
-            >
-              <div
-                className="px-4 py-3 rounded-xl text-sm text-emerald-300 font-medium"
-                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }}
-              >
-                🎯 ¡Ojo clínico! Encontraste todos los errores. Así reviso cada componente antes de
-                entregar.
+      {/* Error detail */}
+      <AnimatePresence>
+        {shownDetail && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <GlassCard className="p-4">
+              <div className="flex items-start gap-2">
+                <Check size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#10B981' }} />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#10B981' }}>
+                    Error #{shownDetail}: {ERRORS.find(e => e.id === shownDetail)?.label}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                    {ERRORS.find(e => e.id === shownDetail)?.detail}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setShowCorrected((v) => !v)}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-                style={{ background: '#8B5CF6' }}
-              >
-                {showCorrected ? '← Ver versión con errores' : 'Ver la versión correcta →'}
-              </button>
-            </motion.div>
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error list */}
+      {found.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {found.map(id => (
+            <p key={id} className="text-xs text-[var(--color-text-muted)] flex gap-2 items-center">
+              <span style={{ color: '#10B981' }}>✓</span>
+              {ERRORS.find(e => e.id === id)?.label}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {!submitted && found.length > 0 && found.length < ERRORS.length && (
+        <button
+          onClick={handleSubmit}
+          className="self-start px-4 py-2 rounded-xl text-sm font-medium border transition-all"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+        >
+          Terminar con {found.length} encontrado(s)
+        </button>
+      )}
+
+      {submitted && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold" style={{ color: pts >= 90 ? '#10B981' : '#F59E0B' }}>
+            {pts}/130 pts — {found.length === 7 ? '¡Ojo clínico perfecto!' : `Encontraste ${found.length} de 7 errores.`}
+          </p>
+          <button
+            onClick={() => setShowFixed(!showFixed)}
+            className="self-start text-xs font-medium px-3 py-1.5 rounded-lg border transition-all"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            {showFixed ? 'Volver al original' : 'Ver versión corregida →'}
+          </button>
+          {showFixed && (
+            <GlassCard className="p-4">
+              <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                Versión corregida: indentación uniforme (16px en nav), stat cards misma altura (96px),
+                moneda unificada (S/ 12,000), padding de tabla py-3 en todas las filas,
+                estado en font-medium uniforme, header con padding-left: 20px, íconos 20px en header.
+              </p>
+            </GlassCard>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
-// ─── Design System Playground ─────────────────────────────────────────────────
+// ── Exercise 2: Design System Playground ─────────────────────────────────────
 
-const ACCENT_OPTIONS = [
-  { label: 'Indigo', value: '#6366F1' },
-  { label: 'Cyan', value: '#06B6D4' },
-  { label: 'Green', value: '#10B981' },
-  { label: 'Rose', value: '#F43F5E' },
-]
-
-function DesignPlayground() {
+function DesignPlayground({ onComplete }: { onComplete: (pts: number) => void }) {
   const [spacing, setSpacing] = useState(8)
   const [radius, setRadius] = useState(8)
-  const [fontSize, setFontSize] = useState(16)
-  const [accentIdx, setAccentIdx] = useState(0)
-
-  const accent = ACCENT_OPTIONS[accentIdx].value
+  const [fontSize, setFontSize] = useState(14)
+  const [shadow, setShadow] = useState(10)
+  const [animSpeed, setAnimSpeed] = useState(300)
+  const [accent, setAccent] = useState('#6366F1')
+  const [submitted, setSubmitted] = useState(false)
 
   const previewVars = {
     '--pw-sp': `${spacing}px`,
     '--pw-r': `${radius}px`,
     '--pw-fs': `${fontSize}px`,
+    '--pw-sh': `0 0 ${shadow}px rgba(0,0,0,0.4)`,
     '--pw-accent': accent,
   } as React.CSSProperties
 
+  const gianValues = { spacing: 8, radius: 8, fontSize: 14, shadow: 10, accent: '#6366F1' }
+
+  const handleDone = () => {
+    if (submitted) return
+    let score = 50
+    const diffs = [
+      Math.abs(spacing - gianValues.spacing),
+      Math.abs(radius - gianValues.radius),
+      Math.abs(fontSize - gianValues.fontSize),
+      Math.abs(shadow - gianValues.shadow),
+    ]
+    diffs.forEach(d => { score -= d * 2 })
+    if (accent !== gianValues.accent) score -= 10
+    const finalScore = Math.max(0, Math.min(50, score))
+    setSubmitted(true)
+    onComplete(finalScore)
+  }
+
+  const SliderRow = ({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) => (
+    <div className="flex items-center gap-4">
+      <span className="text-xs text-[var(--color-text-muted)] w-28 flex-shrink-0">{label}</span>
+      <input
+        type="range" min={min} max={max} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        disabled={submitted}
+        className="flex-1 accent-[#6366F1]"
+      />
+      <span className="text-xs font-mono text-[var(--color-text-secondary)] w-10 text-right">{value}</span>
+    </div>
+  )
+
   return (
-    <div className="flex flex-col lg:flex-row gap-8">
-      {/* Controls */}
-      <div className="flex flex-col gap-5 lg:w-64 flex-shrink-0">
-        <div>
-          <label className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-2">
-            Grid base: {spacing}px
-          </label>
-          <input
-            type="range"
-            min={4}
-            max={12}
-            value={spacing}
-            onChange={(e) => setSpacing(Number(e.target.value))}
-            className="w-full accent-[#8B5CF6]"
-          />
-        </div>
+    <div className="flex flex-col gap-6">
+      {/* Sliders */}
+      <GlassCard className="p-5">
+        <div className="flex flex-col gap-4">
+          <SliderRow label="Spacing base (px)" value={spacing} min={4} max={12} onChange={setSpacing} />
+          <SliderRow label="Border radius (px)" value={radius} min={0} max={20} onChange={setRadius} />
+          <SliderRow label="Font size (px)" value={fontSize} min={12} max={18} onChange={setFontSize} />
+          <SliderRow label="Shadow blur (px)" value={shadow} min={0} max={20} onChange={setShadow} />
+          <SliderRow label="Anim speed (ms)" value={animSpeed} min={100} max={600} onChange={setAnimSpeed} />
 
-        <div>
-          <label className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-2">
-            Border radius: {radius}px
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={20}
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            className="w-full accent-[#8B5CF6]"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-2">
-            Font size: {fontSize}px
-          </label>
-          <input
-            type="range"
-            min={12}
-            max={18}
-            value={fontSize}
-            onChange={(e) => setFontSize(Number(e.target.value))}
-            className="w-full accent-[#8B5CF6]"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider block mb-2">
-            Accent color
-          </label>
-          <div className="flex gap-2">
-            {ACCENT_OPTIONS.map((opt, i) => (
-              <button
-                key={opt.value}
-                onClick={() => setAccentIdx(i)}
-                className="w-7 h-7 rounded-full transition-all duration-150 border-2"
-                style={{
-                  background: opt.value,
-                  borderColor: i === accentIdx ? 'white' : 'transparent',
-                  transform: i === accentIdx ? 'scale(1.15)' : 'scale(1)',
-                }}
-                title={opt.label}
-              />
-            ))}
+          {/* Accent colors */}
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-[var(--color-text-muted)] w-28 flex-shrink-0">Accent color</span>
+            <div className="flex gap-2">
+              {ACCENT_OPTIONS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => !submitted && setAccent(c)}
+                  className="w-6 h-6 rounded-full transition-all"
+                  style={{
+                    background: c,
+                    outline: accent === c ? `2px solid white` : 'none',
+                    outlineOffset: 2,
+                    transform: accent === c ? 'scale(1.2)' : 'scale(1)',
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
-
-        <button
-          onClick={() => {
-            setSpacing(8)
-            setRadius(8)
-            setFontSize(16)
-            setAccentIdx(0)
-          }}
-          className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors text-left"
-        >
-          ↺ Resetear valores
-        </button>
-      </div>
+      </GlassCard>
 
       {/* Preview */}
-      <div className="flex-1 min-w-0" style={previewVars as React.CSSProperties}>
-        <GlassCard className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-4">
-            Preview en vivo
-          </p>
-          <div
-            className="flex flex-col"
-            style={{ gap: 'var(--pw-sp)' } as React.CSSProperties}
-          >
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: 'var(--pw-sp)' } as React.CSSProperties}>
-              <button
-                style={{
-                  padding: `var(--pw-sp) calc(var(--pw-sp) * 2)`,
-                  borderRadius: 'var(--pw-r)',
-                  background: 'var(--pw-accent)',
-                  color: 'white',
-                  fontSize: 'var(--pw-fs)',
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'default',
-                } as React.CSSProperties}
-              >
-                Primario
-              </button>
-              <button
-                style={{
-                  padding: `var(--pw-sp) calc(var(--pw-sp) * 2)`,
-                  borderRadius: 'var(--pw-r)',
-                  background: 'transparent',
-                  color: 'var(--color-text-primary)',
-                  fontSize: 'var(--pw-fs)',
-                  fontWeight: 500,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  cursor: 'default',
-                } as React.CSSProperties}
-              >
-                Secundario
-              </button>
-            </div>
-
+      <div style={previewVars}>
+        <GlassCard className="p-5">
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-4">Preview del sistema</p>
+          <div className="flex flex-wrap gap-3 items-start">
+            {/* Primary button */}
+            <button
+              className="font-semibold text-white transition-all"
+              style={{
+                padding: `var(--pw-sp) calc(var(--pw-sp) * 2)`,
+                borderRadius: `var(--pw-r)`,
+                fontSize: `var(--pw-fs)`,
+                boxShadow: `var(--pw-sh)`,
+                background: `var(--pw-accent)`,
+                transitionDuration: `${animSpeed}ms`,
+              }}
+            >
+              Confirmar
+            </button>
+            {/* Secondary button */}
+            <button
+              className="font-medium transition-all"
+              style={{
+                padding: `var(--pw-sp) calc(var(--pw-sp) * 2)`,
+                borderRadius: `var(--pw-r)`,
+                fontSize: `var(--pw-fs)`,
+                boxShadow: `var(--pw-sh)`,
+                border: `1px solid var(--pw-accent)`,
+                color: `var(--pw-accent)`,
+                background: 'transparent',
+                transitionDuration: `${animSpeed}ms`,
+              }}
+            >
+              Cancelar
+            </button>
             {/* Input */}
             <input
-              readOnly
-              placeholder="Campo de texto..."
+              placeholder="usuario@correo.com"
+              className="outline-none bg-transparent"
               style={{
                 padding: `var(--pw-sp) calc(var(--pw-sp) * 1.5)`,
-                borderRadius: 'var(--pw-r)',
-                fontSize: 'var(--pw-fs)',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: `var(--pw-r)`,
+                fontSize: `var(--pw-fs)`,
+                border: `1px solid rgba(255,255,255,0.15)`,
                 color: 'var(--color-text-secondary)',
-                outline: 'none',
-              } as React.CSSProperties}
+              }}
             />
-
-            {/* Mini card */}
+            {/* Badge */}
+            <span
+              className="font-semibold"
+              style={{
+                padding: `calc(var(--pw-sp) * 0.4) calc(var(--pw-sp))`,
+                borderRadius: `calc(var(--pw-r) * 2)`,
+                fontSize: `calc(var(--pw-fs) - 2px)`,
+                background: `${accent}20`,
+                color: `var(--pw-accent)`,
+              }}
+            >
+              Badge
+            </span>
+            {/* Card */}
             <div
               style={{
-                padding: `calc(var(--pw-sp) * 1.5)`,
-                borderRadius: 'var(--pw-r)',
-                background: 'rgba(255,255,255,0.04)',
+                padding: `var(--pw-sp)`,
+                borderRadius: `var(--pw-r)`,
+                fontSize: `var(--pw-fs)`,
+                boxShadow: `var(--pw-sh)`,
+                background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--pw-sp)',
-              } as React.CSSProperties}
+                color: 'var(--color-text-secondary)',
+                minWidth: 120,
+              }}
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 'var(--pw-r)',
-                  background: `${accent}25`,
-                  flexShrink: 0,
-                }}
-              />
-              <div>
-                <p style={{ fontSize: 'var(--pw-fs)', fontWeight: 600, color: 'var(--color-text-primary)' } as React.CSSProperties}>
-                  Componente card
-                </p>
-                <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Subtítulo descriptivo</p>
-              </div>
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  padding: `calc(var(--pw-sp) * 0.5) var(--pw-sp)`,
-                  borderRadius: 'var(--pw-r)',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: `${accent}20`,
-                  color: accent,
-                } as React.CSSProperties}
-              >
-                Badge
-              </span>
+              Card de ejemplo
             </div>
           </div>
         </GlassCard>
-
-        <p className="text-xs text-[var(--color-text-muted)] mt-3 leading-relaxed">
-          Con un design system, cambiar el spacing de 8px a 12px actualiza{' '}
-          <strong className="text-[var(--color-text-secondary)]">TODA</strong> la interfaz de forma
-          consistente. Sin excepciones.
-        </p>
       </div>
-    </div>
-  )
-}
 
-// ─── Checklist ────────────────────────────────────────────────────────────────
-
-const CHECKLIST = [
-  'Spacing basado en grid de 8px',
-  'Colores del sistema, no valores hardcodeados',
-  'Estados hover, focus y active definidos',
-  'Responsive verificado en 3 breakpoints',
-  'Contraste de texto ≥ 4.5:1 (WCAG AA)',
-  'Animaciones bajo 400ms',
-  'Nombres de clases descriptivos',
-  'Código revisado antes del commit',
-]
-
-function Checklist() {
-  const ref = useRef<HTMLDivElement>(null)
-  const isVisible = useIntersectionObserver(ref, { threshold: 0.2 })
-
-  return (
-    <div ref={ref} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {CHECKLIST.map((item, i) => (
-        <motion.div
-          key={item}
-          initial={{ opacity: 0, x: -12 }}
-          animate={isVisible ? { opacity: 1, x: 0 } : { opacity: 0, x: -12 }}
-          transition={{ delay: i * 0.08, duration: 0.3 }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{
-            background: 'rgba(139,92,246,0.06)',
-            border: '1px solid rgba(139,92,246,0.15)',
-          }}
+      {!submitted && (
+        <button
+          onClick={handleDone}
+          className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+          style={{ background: '#6366F1' }}
         >
-          <CheckCircle2 size={16} className="flex-shrink-0" style={{ color: '#8B5CF6' }} />
-          <span className="text-sm text-[var(--color-text-secondary)]">{item}</span>
-        </motion.div>
-      ))}
+          Guardar configuración →
+        </button>
+      )}
+
+      {submitted && (
+        <p className="text-sm font-semibold" style={{ color: '#10B981' }}>
+          Configuración guardada. El sistema de diseño de Gian usa spacing:8, radius:8, fontSize:14, shadow:10, accent:#6366F1.
+        </p>
+      )}
     </div>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export function AttentionToDetailPage() {
-  useScrollToTop()
+  const [ex1Score, setEx1Score] = useState<number | null>(null)
+  const [ex2Score, setEx2Score] = useState<number | null>(null)
+
+  const totalScore = (ex1Score ?? 0) + (ex2Score ?? 0)
+  const allDone = ex1Score !== null && ex2Score !== null
 
   return (
     <AboutPageLayout
       title="Atención al Detalle"
-      description="Cada píxel y cada función importan. La calidad no es negociable."
+      description="El 80% de la percepción de calidad viene del 20% de detalles visuales que la mayoría ignora."
       valueNumber="02"
-      accentColor="#8B5CF6"
+      accentColor="#06B6D4"
       prevPath="/sobre-mi/clean-code"
       prevLabel="Clean Code"
       nextPath="/sobre-mi/aprendizaje-continuo"
       nextLabel="Aprendizaje continuo"
     >
-      {/* Inspector */}
-      <section className="mb-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            ¿Puedes encontrar los errores?
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Esta card tiene 6 problemas de diseño sutiles. Pasa el cursor sobre cada zona para
-            detectarlos y haz clic para confirmarlos.
-          </p>
-        </div>
-        <UIInspector />
-      </section>
+      <div className="flex flex-col gap-10">
 
-      {/* Design Playground */}
-      <section className="mb-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            Construye con consistencia
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Ajusta los valores y ve cómo un design system mantiene la coherencia en todos los
-            componentes.
+        {/* Quote */}
+        <div className="relative pl-6 py-1" style={{ borderLeft: '4px solid #06B6D4' }}>
+          <p className="text-[var(--color-text-secondary)] leading-relaxed italic">
+            "En el proyecto de React con Grupo Centro Tecnológico, revisaba cada componente contra el diseño de Figma
+            píxel a píxel antes de hacer commit. El cliente nunca lo notó explícitamente — pero el producto se sentía premium.
+            Eso es exactamente lo que el detalle compra: la sensación de calidad que nadie puede nombrar pero todos sienten."
           </p>
+          <p className="text-xs font-semibold mt-3" style={{ color: '#06B6D4' }}>— Gian, proyecto React, Grupo Centro Tecnológico</p>
+          <Quote size={16} className="absolute top-1 right-0 opacity-20" style={{ color: '#06B6D4' }} />
         </div>
-        <DesignPlayground />
-      </section>
 
-      {/* Checklist */}
-      <section>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            Mi checklist real
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Lo que verifico antes de considerar un componente terminado.
-          </p>
+        {/* Pills */}
+        <div className="flex flex-wrap gap-2">
+          {['Grid de 8px siempre', 'Diseño = comunicación', 'El usuario siente lo que no ve'].map(p => (
+            <span
+              key={p}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: 'rgba(6,182,212,0.12)', color: '#67E8F9', border: '1px solid rgba(6,182,212,0.25)' }}
+            >
+              {p}
+            </span>
+          ))}
         </div>
-        <Checklist />
-      </section>
+
+        {/* Exercise 1 */}
+        <GlassCard className="p-6">
+          <ChallengeCard
+            number={1}
+            total={2}
+            title="Encuentra los errores de UI"
+            context={
+              <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                Este dashboard tiene 7 errores de inconsistencia visual. Hay un timer activo — cuanto antes los encuentres, más cerca estás de un ojo clínico real. Haz click en las zonas problemáticas.
+              </span>
+            }
+            question="¿Cuántos errores de diseño puedes detectar? Los primeros 3 valen 15pts, los siguientes 3 valen 20pts, el último vale 25pts."
+            points={130}
+          >
+            <DashboardInspector onComplete={setEx1Score} />
+          </ChallengeCard>
+        </GlassCard>
+
+        {/* Exercise 2 — unlocks after ex1 */}
+        <AnimatePresence>
+          {ex1Score !== null && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <GlassCard className="p-6">
+                <ChallengeCard
+                  number={2}
+                  total={2}
+                  title="Construye tu sistema de diseño"
+                  context={
+                    <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                      Un sistema de diseño consistente es la base de cualquier UI profesional. Ajusta los parámetros y observa cómo cambia la percepción visual.
+                    </span>
+                  }
+                  question="Configura los valores del sistema de diseño. ¿Puedes llegar a los mismos valores que usa Gian en producción?"
+                  points={50}
+                >
+                  <DesignPlayground onComplete={setEx2Score} />
+                </ChallengeCard>
+              </GlassCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ScoreBoard */}
+        <AnimatePresence>
+          {allDone && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <ScoreBoard
+                userScore={totalScore}
+                maxScore={180}
+                gianScore={180}
+                feedback={FEEDBACK}
+                gianComment="En el proyecto de React con Grupo Centro Tecnológico revisaba cada componente contra el diseño de Figma píxel a píxel antes de hacer commit. Una vez encontré 11 inconsistencias en una sola card. El cliente nunca lo notó, pero el producto se sentía premium."
+                onReset={() => {
+                  setEx1Score(null)
+                  setEx2Score(null)
+                }}
+                onNext={() => { window.location.href = '/sobre-mi/aprendizaje-continuo' }}
+                nextLabel="Siguiente: Aprendizaje continuo →"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+      </div>
     </AboutPageLayout>
   )
 }

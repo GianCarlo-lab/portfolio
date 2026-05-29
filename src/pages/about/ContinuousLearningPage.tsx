@@ -1,543 +1,375 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, Trophy } from 'lucide-react'
+import { Quote, ChevronDown, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { AboutPageLayout } from './AboutPageLayout'
-import { useScrollToTop } from '@/hooks/useScrollToTop'
+import { ChallengeCard } from '@/components/common/ChallengeCard/ChallengeCard'
+import { ScoreBoard } from '@/components/common/ScoreBoard/ScoreBoard'
 import { GlassCard } from '@/components/ui/GlassCard/GlassCard'
-import { getTechIcon } from '@/utils/techIcons'
+import type { FeedbackRange } from '@/components/common/ScoreBoard/ScoreBoard'
 
-// ─── Timeline data ────────────────────────────────────────────────────────────
+// ── Data ────────────────────────────────────────────────────────────────────
 
-interface TimelineItem {
-  year: string
-  company: string
-  color: string
-  badge?: string
-  icons: string[]
-  achievement: string
-  projects: string[]
-  challenge: string
-  change: string
-}
+const MAX_WEEKS = 12
 
-const TIMELINE: TimelineItem[] = [
+const TECHS = [
+  { id: 'react', label: 'React avanzado', gian: 3 },
+  { id: 'ts', label: 'TypeScript', gian: 2 },
+  { id: 'backend', label: 'Backend .NET', gian: 2 },
+  { id: 'db', label: 'Base de datos SQL', gian: 2 },
+  { id: 'cloud', label: 'Cloud Azure', gian: 1 },
+  { id: 'projects', label: 'Proyectos reales', gian: 2 },
+]
+
+const TIMELINE_NODES = [
   {
-    year: '2026 — Presente',
-    company: 'RADAR',
-    color: '#6366F1',
-    badge: 'Actual',
-    icons: ['.NET 8', 'Blazor', 'SQL Server', 'Azure', 'ClosedXML', 'QuestPDF'],
-    achievement: 'Sistema ERP con 10+ módulos en producción',
-    projects: ['Módulo de Abastecimiento ERP', 'Módulo de Inventario', 'Reportes PDF/Excel corporativos'],
-    challenge:
-      'Diseñar arquitectura de módulos complejos con alta carga transaccional y reportes en tiempo real.',
-    change:
-      'Empecé a aplicar Clean Architecture y Domain-Driven Design de forma práctica, no solo teórica.',
-  },
-  {
-    year: '2025',
-    company: 'Grupo Centro Tecnológico',
-    color: '#06B6D4',
-    icons: ['React', 'TypeScript', 'Tailwind CSS', 'Java', 'JWT'],
-    achievement: 'Primera experiencia en equipo Scrum real',
-    projects: ['Dashboard de Reportes', 'API de Autenticación con JWT', 'UI con React + TypeScript'],
-    challenge:
-      'Primer trabajo en equipo real con metodología Scrum, pull requests y code reviews diarios.',
-    change:
-      'Aprendí a comunicarme en PRs, documentar decisiones técnicas y dar feedback constructivo.',
+    year: '2023',
+    org: 'Cibertec',
+    what: 'Fundamentos',
+    knew: 'HTML, CSS básico, algo de JavaScript',
+    built: 'Landing pages estáticas, formularios simples',
+    changed: 'Entendí que el frontend no es solo diseño — hay lógica detrás de cada interacción.',
   },
   {
     year: '2024',
-    company: 'Gotech (Freelance)',
-    color: '#8B5CF6',
-    icons: ['WordPress', 'PHP', 'WooCommerce'],
-    achievement: 'Primer e-commerce en producción',
-    projects: ['E-commerce con WooCommerce', 'Landing pages de alta conversión', 'Integraciones de pago'],
-    challenge:
-      'Entregar proyectos con plazos reales, clientes no técnicos y presupuestos ajustados.',
-    change:
-      'Desarrollé criterio para priorizar funcionalidad sobre perfección. El software que funciona es mejor que el perfecto que nunca termina.',
+    org: 'Gotech',
+    what: 'React + .NET',
+    knew: 'React básico con hooks, C# principiante',
+    built: 'Dashboard de ventas, API REST con .NET 6, integración con SQL Server',
+    changed: 'Por primera vez vi el sistema completo: del formulario en React hasta el dato en la BD. Eso cambió cómo pienso cualquier feature.',
   },
   {
-    year: '2023 — Inicio',
-    company: 'Cibertec',
-    color: '#475569',
-    icons: ['HTML5', 'JavaScript', 'CSS3', 'Git'],
-    achievement: 'Fundamentos sólidos y primer proyecto personal',
-    projects: ['Sistema de votación en Java', 'Portafolio personal (HTML/CSS)', 'CRUD básico con BD'],
-    challenge: 'Entender los fundamentos de programación, lógica y arquitectura desde cero.',
-    change:
-      'Descubrí que me apasiona construir cosas que la gente usa realmente, no solo ejercicios académicos.',
+    year: '2025',
+    org: 'Grupo Centro Tecnológico',
+    what: 'Producción real',
+    knew: 'React con TypeScript, .NET con Entity Framework, SQL Server avanzado',
+    built: 'Sistema de ventas con reportes Excel, módulo de clientes, integración con Figma para diseño de componentes',
+    changed: 'Aprendí que escribir código que funciona y escribir código que los demás pueden mantener son dos habilidades completamente distintas.',
+  },
+  {
+    year: '2026',
+    org: 'RADAR ERP',
+    what: 'Ownership fullstack',
+    knew: 'Fullstack React + .NET + SQL, Blazor básico, diseño de sistemas',
+    built: 'Módulo completo de Abastecimiento: schema SQL, API REST, Blazor UI, reportes Excel',
+    changed: 'Aprendí Blazor en 2 semanas leyendo documentación oficial y construyendo features reales. Sin curso, sin mentor. Solo documentación + errores + soluciones.',
   },
 ]
 
-// ─── Tech selector data ───────────────────────────────────────────────────────
-
-interface TechData {
-  level: number
-  time: string
-  resources: string[]
-  tip: string
-  color: string
-}
-
-const TECH_DATA: Record<string, TechData> = {
-  React: {
-    level: 80,
-    time: '6 meses para fundamentos, 1 año para fluidez real',
-    resources: ['React.dev (docs oficiales)', 'Proyectos reales desde el día 1', 'Frontend Masters'],
-    tip: 'Construye un proyecto real desde el día 1. Los tutoriales no reemplazan la práctica.',
-    color: '#61DAFB',
-  },
-  TypeScript: {
-    level: 85,
-    time: '3 meses para fundamentos, continuo perfeccionamiento',
-    resources: ['TypeScript Handbook oficial', 'type-challenges en GitHub', 'Proyectos propios con strict: true'],
-    tip: 'Activa strict: true desde el inicio. El dolor al principio te ahorra bugs en producción.',
-    color: '#3178C6',
-  },
-  '.NET': {
-    level: 75,
-    time: '8 meses para nivel profesional funcional',
-    resources: ['Microsoft Learn', 'Nick Chapsas en YouTube', 'Proyectos ERP reales en RADAR'],
-    tip: 'Domina C# antes de ASP.NET. Una base sólida de POO acelera todo lo demás.',
-    color: '#512BD4',
-  },
-  Docker: {
-    level: 35,
-    time: 'En progreso — ~2 meses activos',
-    resources: ['Docker Docs oficiales', 'TechWorld with Nana (YouTube)', 'Lab propio con docker-compose'],
-    tip: 'Empieza containerizando tu propio proyecto. La teoría sin práctica no sirve.',
-    color: '#2496ED',
-  },
-  AWS: {
-    level: 10,
-    time: 'Próximamente — planificado para Q4 2026',
-    resources: ['AWS Free Tier (laboratorios gratuitos)', 'AWS Skills Builder', 'Arquitecturas de referencia'],
-    tip: 'Empieza con S3 + EC2 antes de tocar Lambda o servicios avanzados.',
-    color: '#FF9900',
-  },
-}
-
-const TECH_PILLS = Object.keys(TECH_DATA)
-
-// ─── Roadmap data ─────────────────────────────────────────────────────────────
-
-interface RoadmapItem {
-  name: string
-  current: number
-  why: string
-  when: string
-  color: string
-}
-
-const ROADMAP_A: RoadmapItem[] = [
-  {
-    name: 'Docker & DevOps',
-    current: 35,
-    why: 'Todo proyecto moderno necesita containerización para despliegue reproducible y consistente.',
-    when: 'Q3 2026',
-    color: '#2496ED',
-  },
-  {
-    name: 'AWS Cloud',
-    current: 10,
-    why: 'El mercado exige conocimiento de cloud. AWS es el estándar en la industria peruana y regional.',
-    when: 'Q4 2026',
-    color: '#FF9900',
-  },
-  {
-    name: 'React Native',
-    current: 5,
-    why: 'La demanda de apps móviles es enorme y mi background en React acelera el aprendizaje considerablemente.',
-    when: '2027',
-    color: '#61DAFB',
-  },
+const FEEDBACK: FeedbackRange[] = [
+  { range: [0, 20], message: "La distribución tiene margen de mejora. Reflexiona sobre qué necesitas más para el siguiente nivel.", color: '#F59E0B' },
+  { range: [21, 40], message: "Buena intención. La mezcla de teoría y práctica te llevará más lejos.", color: '#06B6D4' },
+  { range: [41, 55], message: "Distribución sólida. Frontend + Backend + BD es el triángulo mínimo viable.", color: '#10B981' },
+  { range: [56, 60], message: "¡Muy cerca de la distribución óptima! Así es como Gian distribuye su tiempo.", color: '#6366F1' },
 ]
 
-const ROADMAP_B: RoadmapItem[] = [
-  {
-    name: 'GraphQL',
-    current: 15,
-    why: 'Alternativa a REST para APIs complejas con múltiples consumidores y necesidades distintas.',
-    when: 'Q4 2026',
-    color: '#E10098',
-  },
-  {
-    name: 'Kubernetes',
-    current: 5,
-    why: 'Orquestación de contenedores para sistemas de alta disponibilidad a escala.',
-    when: '2027',
-    color: '#326CE5',
-  },
-  {
-    name: 'Next.js avanzado',
-    current: 40,
-    why: 'SSR/SSG para proyectos que necesitan SEO óptimo y rendimiento de primer nivel.',
-    when: 'Q3 2026',
-    color: '#ffffff',
-  },
-]
+// ── Exercise 1: Time Distribution ────────────────────────────────────────────
 
-// ─── Timeline component ───────────────────────────────────────────────────────
-
-function InteractiveTimeline() {
-  const [activeIdx, setActiveIdx] = useState<number | null>(0)
-
-  return (
-    <div className="flex flex-col gap-2">
-      {TIMELINE.map((item, i) => {
-        const isOpen = activeIdx === i
-        return (
-          <div key={item.year}>
-            <button
-              onClick={() => setActiveIdx(isOpen ? null : i)}
-              className="w-full flex gap-4 pb-0 text-left group"
-            >
-              {/* Rail */}
-              <div className="flex flex-col items-center w-5 flex-shrink-0 mt-1">
-                <motion.div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  animate={{ scale: isOpen ? 1.2 : 1, boxShadow: isOpen ? `0 0 12px ${item.color}90` : 'none' }}
-                  style={{ background: item.color }}
-                />
-                {i < TIMELINE.length - 1 && (
-                  <div
-                    className="w-px mt-1"
-                    style={{
-                      height: 36,
-                      background: `linear-gradient(to bottom, ${item.color}50, ${TIMELINE[i + 1].color}25)`,
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Header row */}
-              <div className="flex items-center gap-3 flex-1 min-w-0 py-1">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-bold" style={{ color: item.color }}>
-                      {item.year}
-                    </span>
-                    {item.badge && (
-                      <span
-                        className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background: `${item.color}20`, color: item.color }}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-[var(--color-text-muted)]">{item.company}</p>
-                </div>
-                <ChevronDown
-                  size={14}
-                  className="text-[var(--color-text-muted)] flex-shrink-0 transition-transform duration-200"
-                  style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                />
-              </div>
-            </button>
-
-            {/* Expanded detail */}
-            <AnimatePresence>
-              {isOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden"
-                >
-                  <div className="pl-9 pb-4 flex flex-col gap-4">
-                    {/* Achievement */}
-                    <GlassCard className="flex items-center gap-2.5 px-3 py-2">
-                      <Trophy size={13} className="flex-shrink-0" style={{ color: item.color }} />
-                      <span className="text-xs text-[var(--color-text-secondary)]">
-                        {item.achievement}
-                      </span>
-                    </GlassCard>
-
-                    {/* Tech icons */}
-                    <div className="flex flex-wrap gap-2">
-                      {item.icons.map((name) => {
-                        const icon = getTechIcon(name, 14)
-                        return (
-                          <span
-                            key={name}
-                            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)]"
-                          >
-                            {icon}
-                            {name}
-                          </span>
-                        )
-                      })}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Projects */}
-                      <div
-                        className="p-3 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                      >
-                        <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)] mb-2">
-                          Proyectos
-                        </p>
-                        <ul className="flex flex-col gap-1">
-                          {item.projects.map((p) => (
-                            <li key={p} className="text-xs text-[var(--color-text-secondary)]">
-                              · {p}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Challenge */}
-                      <div
-                        className="p-3 rounded-xl"
-                        style={{ background: `${item.color}08`, border: `1px solid ${item.color}20` }}
-                      >
-                        <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: item.color }}>
-                          Desafío principal
-                        </p>
-                        <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                          {item.challenge}
-                        </p>
-                      </div>
-
-                      {/* Change */}
-                      <div
-                        className="p-3 rounded-xl"
-                        style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
-                      >
-                        <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-400 mb-2">
-                          Qué cambió
-                        </p>
-                        <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                          {item.change}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )
-      })}
-
-      <p className="text-xs italic pl-9 mt-1" style={{ color: 'var(--color-accent)' }}>
-        Y esto no para aquí.
-      </p>
-    </div>
+function TimeDistribution({ onComplete }: { onComplete: (pts: number) => void }) {
+  const [values, setValues] = useState<Record<string, number>>(
+    Object.fromEntries(TECHS.map(t => [t.id, 0]))
   )
-}
+  const [submitted, setSubmitted] = useState(false)
+  const [pts, setPts] = useState(0)
+  const [feedback, setFeedback] = useState<{ type: 'warn' | 'ok'; msg: string }[]>([])
 
-// ─── Tech selector ────────────────────────────────────────────────────────────
+  const total = Object.values(values).reduce((a, b) => a + b, 0)
 
-function TechSelector() {
-  const [selected, setSelected] = useState('React')
-  const data = TECH_DATA[selected]
+  const handleChange = (id: string, raw: number) => {
+    const others = TECHS.filter(t => t.id !== id).reduce((s, t) => s + (values[t.id] ?? 0), 0)
+    const capped = Math.min(raw, MAX_WEEKS - others)
+    setValues(prev => ({ ...prev, [id]: capped }))
+  }
+
+  const handleSubmit = () => {
+    const msgs: { type: 'warn' | 'ok'; msg: string }[] = []
+
+    if (values['projects'] === 0) {
+      msgs.push({ type: 'warn', msg: "Sin proyectos reales, el conocimiento teórico no se consolida. Puedes saber todo sobre React y no saber cómo estructurar una app real." })
+    }
+
+    const overSpec = TECHS.find(t => (values[t.id] ?? 0) > 4)
+    if (overSpec) {
+      msgs.push({ type: 'warn', msg: `La hiperespecialización temprana en ${overSpec.label} limita las oportunidades. Un fullstack diversificado puede atacar cualquier problema.` })
+    }
+
+    if (msgs.length === 0) {
+      msgs.push({ type: 'ok', msg: "Buena distribución. Frontend + Backend + BD es el triángulo mínimo viable para un fullstack productivo." })
+    }
+
+    let score = 60
+    TECHS.forEach(t => {
+      const diff = Math.abs((values[t.id] ?? 0) - t.gian)
+      score -= diff * 4
+    })
+    score = Math.max(0, Math.min(60, score))
+    setPts(score)
+    setFeedback(msgs)
+    setSubmitted(true)
+    onComplete(score)
+  }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Pills */}
-      <div className="flex flex-wrap gap-2">
-        {TECH_PILLS.map((tech) => (
+      {/* Sliders */}
+      <GlassCard className="p-5">
+        <div className="flex flex-col gap-4">
+          {TECHS.map(t => (
+            <div key={t.id} className="flex items-center gap-4">
+              <span className="text-xs text-[var(--color-text-secondary)] w-36 flex-shrink-0">{t.label}</span>
+              <input
+                type="range" min={0} max={MAX_WEEKS}
+                value={values[t.id] ?? 0}
+                disabled={submitted}
+                onChange={e => handleChange(t.id, Number(e.target.value))}
+                className="flex-1 accent-[#6366F1]"
+              />
+              <span className="text-xs font-mono font-semibold w-16 text-right" style={{ color: '#6366F1' }}>
+                {values[t.id] ?? 0} sem
+              </span>
+              {submitted && (
+                <span className="text-xs font-mono text-[var(--color-text-muted)] w-16 text-right">
+                  Gian: {t.gian}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Counter */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-[var(--color-text-muted)]">
+          <span className="font-semibold" style={{ color: total === MAX_WEEKS ? '#10B981' : total > 0 ? '#6366F1' : 'var(--color-text-muted)' }}>
+            {total}
+          </span>
+          {' '}semanas asignadas de {MAX_WEEKS}
+        </p>
+        {total > 0 && !submitted && (
           <button
-            key={tech}
-            onClick={() => setSelected(tech)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200"
-            style={{
-              background: selected === tech ? `${TECH_DATA[tech].color}20` : 'rgba(255,255,255,0.04)',
-              color: selected === tech ? TECH_DATA[tech].color : 'var(--color-text-muted)',
-              border: `1px solid ${selected === tech ? TECH_DATA[tech].color + '40' : 'rgba(255,255,255,0.08)'}`,
-            }}
+            onClick={handleSubmit}
+            className="px-5 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-all"
+            style={{ background: '#6366F1' }}
           >
-            {tech}
+            Ver análisis →
           </button>
-        ))}
+        )}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={selected}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
-        >
-          <GlassCard className="p-5 flex flex-col gap-4">
-            {/* Level bar */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  Nivel actual en {selected}
-                </p>
-                <span className="text-sm font-bold" style={{ color: data.color }}>
-                  {data.level}%
-                </span>
+      {/* Feedback messages */}
+      {submitted && (
+        <div className="flex flex-col gap-3">
+          {feedback.map((f, i) => (
+            <div
+              key={i}
+              className="flex gap-2 p-3 rounded-xl"
+              style={{
+                background: f.type === 'ok' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+                border: `1px solid ${f.type === 'ok' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`,
+              }}
+            >
+              {f.type === 'ok'
+                ? <CheckCircle2 size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+                : <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
+              }
+              <p className="text-xs leading-relaxed" style={{ color: f.type === 'ok' ? '#6EE7B7' : '#FCD34D' }}>
+                {f.msg}
+              </p>
+            </div>
+          ))}
+          <p className="text-sm font-semibold" style={{ color: pts >= 45 ? '#10B981' : '#F59E0B' }}>
+            {pts}/60 pts — similitud con la distribución de Gian
+          </p>
+        </div>
+      )}
+
+      {/* Comparison bars */}
+      {submitted && (
+        <GlassCard className="p-5">
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-4">Comparación semana a semana</p>
+          <div className="flex flex-col gap-3">
+            {TECHS.map(t => {
+              const userVal = values[t.id] ?? 0
+              const userPct = (userVal / MAX_WEEKS) * 100
+              const gianPct = (t.gian / MAX_WEEKS) * 100
+              return (
+                <div key={t.id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-[var(--color-text-muted)]">{t.label}</span>
+                    <span className="text-xs text-[var(--color-text-muted)]">Tú: {userVal} | Gian: {t.gian}</span>
+                  </div>
+                  <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <div className="absolute top-0 left-0 h-full rounded-full opacity-50" style={{ width: `${gianPct}%`, background: '#6366F1' }} />
+                    <div className="absolute top-0 left-0 h-full rounded-full" style={{ width: `${userPct}%`, background: '#10B981', opacity: 0.8 }} />
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex gap-4 mt-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-full bg-green-500 opacity-80" />
+                <span className="text-xs text-[var(--color-text-muted)]">Tú</span>
               </div>
-              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: data.color }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${data.level}%` }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                />
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-full opacity-50" style={{ background: '#6366F1' }} />
+                <span className="text-xs text-[var(--color-text-muted)]">Gian</span>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Time */}
-              <div>
-                <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)] mb-1.5">
-                  Tiempo para aprender
-                </p>
-                <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                  {data.time}
-                </p>
-              </div>
-
-              {/* Resources */}
-              <div>
-                <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)] mb-1.5">
-                  Recursos que usé
-                </p>
-                <ul className="flex flex-col gap-1">
-                  {data.resources.map((r) => (
-                    <li key={r} className="text-xs text-[var(--color-text-secondary)]">
-                      · {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Tip */}
-              <div
-                className="p-3 rounded-xl"
-                style={{ background: `${data.color}0d`, border: `1px solid ${data.color}25` }}
-              >
-                <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: data.color }}>
-                  Tip para aprender más rápido
-                </p>
-                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">{data.tip}</p>
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </GlassCard>
+      )}
     </div>
   )
 }
 
-// ─── Roadmap ──────────────────────────────────────────────────────────────────
+// ── Timeline ──────────────────────────────────────────────────────────────────
 
-function RoadmapSection() {
-  const [showExtra, setShowExtra] = useState(false)
-  const items = showExtra ? [...ROADMAP_A, ...ROADMAP_B] : ROADMAP_A
+function LearningTimeline() {
+  const [open, setOpen] = useState<number | null>(null)
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {items.map((item, i) => (
-          <motion.div
-            key={item.name}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.07, duration: 0.3 }}
+      {TIMELINE_NODES.map((node, i) => (
+        <div key={node.year}>
+          <button
+            onClick={() => setOpen(open === i ? null : i)}
+            className="w-full flex items-center justify-between px-5 py-4 rounded-2xl border transition-all text-left"
+            style={{
+              background: open === i ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
+              borderColor: open === i ? 'rgba(99,102,241,0.3)' : 'var(--color-border)',
+            }}
           >
-            <GlassCard className="p-5 flex flex-col gap-3 h-full">
+            <div className="flex items-center gap-4">
+              <span className="text-lg font-bold" style={{ color: '#6366F1' }}>{node.year}</span>
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="font-semibold text-[var(--color-text-primary)] text-sm">{item.name}</p>
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                    style={{ background: `${item.color}18`, color: item.color }}
-                  >
-                    {item.when}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: item.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${item.current}%` }}
-                    transition={{ delay: i * 0.07 + 0.2, duration: 0.5, ease: 'easeOut' }}
-                  />
-                </div>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-1">{item.current}% actual</p>
+                <p className="text-sm font-semibold text-[var(--color-text-primary)]">{node.org}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">{node.what}</p>
               </div>
-              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed flex-1">
-                {item.why}
-              </p>
-            </GlassCard>
-          </motion.div>
-        ))}
-      </div>
+            </div>
+            <motion.div animate={{ rotate: open === i ? 180 : 0 }} transition={{ duration: 0.2 }}>
+              <ChevronDown size={16} style={{ color: 'var(--color-text-muted)' }} />
+            </motion.div>
+          </button>
 
-      <button
-        onClick={() => setShowExtra((v) => !v)}
-        className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] transition-all"
-      >
-        {showExtra ? '↑ Mostrar menos' : '↓ Ver más tecnologías'}
-      </button>
+          <AnimatePresence>
+            {open === i && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <GlassCard className="p-5 mt-2">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-1">¿Qué sabía?</p>
+                      <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{node.knew}</p>
+                    </div>
+                    <div className="h-px" style={{ background: 'var(--color-border)' }} />
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-1">¿Qué construí?</p>
+                      <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{node.built}</p>
+                    </div>
+                    <div className="h-px" style={{ background: 'var(--color-border)' }} />
+                    <div>
+                      <p className="text-xs font-semibold mb-1" style={{ color: '#6366F1' }}>¿Qué me cambió la forma de pensar?</p>
+                      <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-text-secondary)' }}>"{node.changed}"</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
     </div>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export function ContinuousLearningPage() {
-  useScrollToTop()
+  const [ex1Score, setEx1Score] = useState<number | null>(null)
 
   return (
     <AboutPageLayout
       title="Aprendizaje Continuo"
-      description="Tecnología evoluciona constantemente. Yo también."
+      description="Sin mentor, sin cursos obligatorios. Aprendo leyendo documentación oficial, cometiendo errores y construyendo cosas reales."
       valueNumber="03"
-      accentColor="#06B6D4"
+      accentColor="#10B981"
       prevPath="/sobre-mi/atencion-al-detalle"
       prevLabel="Atención al detalle"
       nextPath="/sobre-mi/vision-fullstack"
-      nextLabel="Visión Full Stack"
+      nextLabel="Visión Fullstack"
     >
-      <section className="mb-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            Mi evolución como desarrollador
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Cada etapa trajo nuevos desafíos y formas de pensar. Haz clic en cada nodo para ver
-            más detalle.
-          </p>
-        </div>
-        <InteractiveTimeline />
-      </section>
+      <div className="flex flex-col gap-10">
 
-      <section className="mb-16">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-            ¿Cuánto tardé en aprender X?
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Selecciona una tecnología para ver mi nivel, cuánto tiempo tomó y cómo aprenderla más
-            rápido.
+        {/* Quote */}
+        <div className="relative pl-6 py-1" style={{ borderLeft: '4px solid #10B981' }}>
+          <p className="text-[var(--color-text-secondary)] leading-relaxed italic">
+            "Empecé con WordPress. Después Java. Después me metí a React sin saber por qué, solo sabía que era lo que se usaba.
+            En RADAR aprendí Blazor en 2 semanas — sin curso, sin mentor. Solo documentación oficial, errores de compilador y features reales entregadas.
+            Eso es lo que significa aprender en serio: no estudiar para aprobar un examen, sino construir cosas que no funcionan hasta que funcionan."
           </p>
+          <p className="text-xs font-semibold mt-3" style={{ color: '#10B981' }}>— Gian, 2023–2026</p>
+          <Quote size={16} className="absolute top-1 right-0 opacity-20" style={{ color: '#10B981' }} />
         </div>
-        <TechSelector />
-      </section>
 
-      <section>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">Lo que sigue</h2>
-          <p className="text-[var(--color-text-secondary)]">
-            Tecnologías en mi roadmap activo, con progreso actual y fecha estimada.
-          </p>
+        {/* Pills */}
+        <div className="flex flex-wrap gap-2">
+          {['Autodidacta', 'Learn by doing', 'Documentación oficial primero'].map(p => (
+            <span
+              key={p}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: 'rgba(16,185,129,0.12)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.25)' }}
+            >
+              {p}
+            </span>
+          ))}
         </div>
-        <RoadmapSection />
-      </section>
+
+        {/* Exercise 1 */}
+        <GlassCard className="p-6">
+          <ChallengeCard
+            number={1}
+            total={1}
+            title="Distribuye 12 semanas de aprendizaje"
+            context={
+              <span className="text-xs block" style={{ color: 'var(--color-text-muted)' }}>
+                Tienes 12 semanas para aprender. No tienes que usar todas. Reflexiona sobre qué priorizarías para convertirte en fullstack productivo.
+              </span>
+            }
+            question="¿Cómo distribuirías tu tiempo para maximizar el aprendizaje fullstack en 12 semanas?"
+            points={60}
+          >
+            <TimeDistribution onComplete={setEx1Score} />
+          </ChallengeCard>
+        </GlassCard>
+
+        {/* ScoreBoard */}
+        <AnimatePresence>
+          {ex1Score !== null && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <ScoreBoard
+                userScore={ex1Score}
+                maxScore={60}
+                gianScore={60}
+                feedback={FEEDBACK}
+                gianComment="Mi distribución real: React avanzado: 3 semanas, TypeScript: 2, Backend .NET: 2, SQL: 2, Cloud Azure: 1, Proyectos reales: 2. El secreto es que los 'proyectos reales' consolidan todo lo demás. Sin eso, el conocimiento no se instala."
+                onReset={() => setEx1Score(null)}
+                onNext={() => { window.location.href = '/sobre-mi/vision-fullstack' }}
+                nextLabel="Siguiente: Visión Fullstack →"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Timeline */}
+        <div>
+          <h4 className="text-base font-bold text-[var(--color-text-primary)] mb-5">Mi línea de aprendizaje</h4>
+          <LearningTimeline />
+        </div>
+
+      </div>
     </AboutPageLayout>
   )
 }
